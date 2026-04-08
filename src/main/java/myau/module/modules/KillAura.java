@@ -64,10 +64,15 @@ public class KillAura extends Module {
     private long attackDelayMS = 0L;
     private int blockTick = 0;
     private int lastTickProcessed;
+    private long reblockDelayMs = 0L;
+    private long unblockBeforeAttackMs = 0L;
+    private long rightHoldBlockDelayMS = 0L;
+    private boolean waitingForAttack = false;
     public final ModeProperty mode;
     public final ModeProperty sort;
     public final ModeProperty autoBlock;
     public final BooleanProperty autoBlockRequirePress;
+    public final BooleanProperty interactAutoBlock;
     public final FloatProperty autoBlockMinCPS;
     public final FloatProperty autoBlockMaxCPS;
     public final FloatProperty autoBlockRange;
@@ -99,12 +104,17 @@ public class KillAura extends Module {
     public final ModeProperty debugLog;
 
     private long getAttackDelay() {
-        return this.isBlocking ? (long) (1000.0F / RandomUtil.nextLong(this.autoBlockMinCPS.getValue().longValue(), this.autoBlockMaxCPS.getValue().longValue())) : 1000L / RandomUtil.nextLong(this.minCPS.getValue(), this.maxCPS.getValue());
+        boolean useAutoBlockCps = this.isBlocking && this.autoBlock.getValue() != 9;
+        return useAutoBlockCps
+                ? (long) (1000.0F / RandomUtil.nextLong(
+                this.autoBlockMinCPS.getValue().longValue(),
+                this.autoBlockMaxCPS.getValue().longValue()))
+                : 1000L / RandomUtil.nextLong(this.minCPS.getValue(), this.maxCPS.getValue());
     }
 
     private boolean performAttack(float yaw, float pitch) {
         if (!Myau.playerStateManager.digging && !Myau.playerStateManager.placing) {
-            if (this.isPlayerBlocking() && this.autoBlock.getValue() != 1) {
+            if (this.isPlayerBlocking() && this.autoBlock.getValue() != 1 && this.autoBlock.getValue() != 9) {
                 return false;
             } else if (this.attackDelayMS > 0L) {
                 return false;
@@ -136,6 +146,18 @@ public class KillAura extends Module {
         this.startBlock(mc.thePlayer.getHeldItem());
     }
 
+    private void startRightHoldBlock(float yaw, float pitch) {
+        if (!this.interactAutoBlock.getValue() || !this.interactAttack(yaw, pitch)) {
+            this.sendUseItem();
+        }
+    }
+
+    private long getRightHoldBlockDelay() {
+        return (long) (1000.0F / RandomUtil.nextLong(
+                this.autoBlockMinCPS.getValue().longValue(),
+                this.autoBlockMaxCPS.getValue().longValue()));
+    }
+
     private void startBlock(ItemStack itemStack) {
         PacketUtil.sendPacket(new C08PacketPlayerBlockPlacement(itemStack));
         mc.thePlayer.setItemInUse(itemStack, itemStack.getMaxItemUseDuration());
@@ -148,7 +170,7 @@ public class KillAura extends Module {
         this.blockingState = false;
     }
 
-    private void interactAttack(float yaw, float pitch) {
+    private boolean interactAttack(float yaw, float pitch) {
         if (this.target != null) {
             MovingObjectPosition mop = RotationUtil.rayTrace(this.target.getBox(), yaw, pitch, 8.0);
             if (mop != null) {
@@ -163,8 +185,18 @@ public class KillAura extends Module {
                 PacketUtil.sendPacket(new C08PacketPlayerBlockPlacement(mc.thePlayer.getHeldItem()));
                 mc.thePlayer.setItemInUse(mc.thePlayer.getHeldItem(), mc.thePlayer.getHeldItem().getMaxItemUseDuration());
                 this.blockingState = true;
+                return true;
             }
         }
+        return false;
+    }
+
+    private long randomReblockDelay() {
+        return RandomUtil.nextLong(60L, 110L);
+    }
+
+    private long randomUnblockDelay() {
+        return RandomUtil.nextLong(35L, 65L);
     }
 
     private boolean canAttack() {
@@ -205,9 +237,9 @@ public class KillAura extends Module {
     private boolean canAutoBlock() {
         if (!ItemUtil.isHoldingSword()) {
             return false;
-        } else {
-            return !this.autoBlockRequirePress.getValue() || PlayerUtil.isUsingItem();
         }
+        return !this.autoBlockRequirePress.getValue()
+                || KeyBindUtil.isKeyDown(mc.gameSettings.keyBindUseItem.getKeyCode());
     }
 
     private boolean hasValidTarget() {
@@ -219,6 +251,12 @@ public class KillAura extends Module {
                                 && this.isValidTarget((EntityLivingBase) entity)
                                 && this.isInBlockRange((EntityLivingBase) entity)
                 );
+    }
+
+    private boolean hasRightHoldTarget() {
+        return this.target != null
+                && this.isValidTarget(this.target.getEntity())
+                && this.isInBlockRange(this.target.getEntity());
     }
 
     private boolean isValidTarget(EntityLivingBase entityLivingBase) {
@@ -327,9 +365,10 @@ public class KillAura extends Module {
         this.mode = new ModeProperty("mode", 0, new String[]{"SINGLE", "SWITCH"});
         this.sort = new ModeProperty("sort", 0, new String[]{"DISTANCE", "HEALTH", "HURT_TIME", "FOV"});
         this.autoBlock = new ModeProperty(
-                "auto-block", 2, new String[]{"NONE", "VANILLA", "SPOOF", "HYPIXEL", "BLINK", "INTERACT", "SWAP", "LEGIT", "FAKE"}
+                "auto-block", 2, new String[]{"NONE", "VANILLA", "SPOOF", "HYPIXEL", "BLINK", "INTERACT", "SWAP", "LEGIT", "FAKE", "RIGHTHOLD"}
         );
         this.autoBlockRequirePress = new BooleanProperty("auto-block-require-press", false);
+        this.interactAutoBlock = new BooleanProperty("interact-auto-block", false, () -> this.autoBlock.getValue() == 9);
         this.autoBlockMinCPS = new FloatProperty("auto-block-min-aps", 8.0F, 1.0F, 20.0F);
         this.autoBlockMaxCPS = new FloatProperty("auto-block-max-aps", 10.0F, 1.0F, 20.0F);
         this.autoBlockRange = new FloatProperty("auto-block-range", 6.0F, 3.0F, 8.0F);
@@ -384,7 +423,8 @@ public class KillAura extends Module {
                     || this.autoBlock.getValue() == 4 // BLINK
                     || this.autoBlock.getValue() == 5 // INTERACT
                     || this.autoBlock.getValue() == 6 // SWAP
-                    || this.autoBlock.getValue() == 7); // LEGIT
+                    || this.autoBlock.getValue() == 7 // LEGIT
+                    || this.autoBlock.getValue() == 9); // RIGHTHOLD
         } else {
             return false;
         }
@@ -409,10 +449,16 @@ public class KillAura extends Module {
             if (this.attackDelayMS > 0L) {
                 this.attackDelayMS -= 50L;
             }
+            if (this.rightHoldBlockDelayMS > 0L) {
+                this.rightHoldBlockDelayMS -= 50L;
+            }
             boolean attack = this.target != null && this.canAttack();
             boolean block = attack && this.canAutoBlock();
             if (!block) {
                 Myau.blinkManager.setBlinkState(false, BlinkModules.AUTO_BLOCK);
+                if (this.autoBlock.getValue() == 9 && this.blockingState && !Myau.playerStateManager.digging && !Myau.playerStateManager.placing) {
+                    this.stopBlock();
+                }
                 this.isBlocking = false;
                 this.fakeBlockState = false;
                 this.blockTick = 0;
@@ -666,6 +712,38 @@ public class KillAura extends Module {
                                     && !Myau.playerStateManager.placing) {
                                 swap = true;
                             }
+                            break;
+
+                        case 9: // RIGHTHOLD
+                            Myau.blinkManager.setBlinkState(false, BlinkModules.AUTO_BLOCK);
+
+                            if (this.hasRightHoldTarget()) {
+                                if (!Myau.playerStateManager.digging && !Myau.playerStateManager.placing) {
+                                    if (!this.isPlayerBlocking()) {
+                                        swap = true;
+                                    }
+
+                                    this.blockTick = 0;
+                                    this.reblockDelayMs = 0L;
+                                    this.unblockBeforeAttackMs = 0L;
+                                    this.waitingForAttack = false;
+                                }
+
+                                this.isBlocking = true;
+                                this.fakeBlockState = false;
+                            } else {
+                                if (this.blockingState && !Myau.playerStateManager.digging && !Myau.playerStateManager.placing) {
+                                    this.stopBlock();
+                                }
+
+                                this.blockTick = 0;
+                                this.reblockDelayMs = 0L;
+                                this.unblockBeforeAttackMs = 0L;
+                                this.waitingForAttack = false;
+                                this.isBlocking = false;
+                                this.fakeBlockState = false;
+                            }
+                            break;
                     }
                 }
                 boolean attacked = false;
@@ -688,10 +766,25 @@ public class KillAura extends Module {
                     }
                     if (attack) {
                         attacked = this.performAttack(event.getNewYaw(), event.getNewPitch());
+
+                        if (this.autoBlock.getValue() == 9
+                                && attacked
+                                && this.hasRightHoldTarget()
+                                && !Myau.playerStateManager.digging
+                                && !Myau.playerStateManager.placing
+                                && this.rightHoldBlockDelayMS <= 0L) {
+                            this.startRightHoldBlock(event.getNewYaw(), event.getNewPitch());
+                            this.rightHoldBlockDelayMS = this.getRightHoldBlockDelay();
+                        }
                     }
                 }
                 if (swap) {
-                    if (attacked) {
+                    if (this.autoBlock.getValue() == 9) {
+                        if (!this.isPlayerBlocking()) {
+                            this.startRightHoldBlock(event.getNewYaw(), event.getNewPitch());
+                            this.rightHoldBlockDelayMS = this.getRightHoldBlockDelay();
+                        }
+                    } else if (attacked) {
                         this.interactAttack(event.getNewYaw(), event.getNewPitch());
                     } else {
                         this.sendUseItem();
@@ -924,14 +1017,26 @@ public class KillAura extends Module {
         this.hitRegistered = false;
         this.attackDelayMS = 0L;
         this.blockTick = 0;
+        this.reblockDelayMs = 0L;
+        this.unblockBeforeAttackMs = 0L;
+        this.rightHoldBlockDelayMS = 0L;
+        this.waitingForAttack = false;
     }
 
     @Override
     public void onDisabled() {
         Myau.blinkManager.setBlinkState(false, BlinkModules.AUTO_BLOCK);
+        if (this.blockingState) {
+            this.stopBlock();
+        }
         this.blockingState = false;
         this.isBlocking = false;
         this.fakeBlockState = false;
+
+        this.reblockDelayMs = 0L;
+        this.unblockBeforeAttackMs = 0L;
+        this.rightHoldBlockDelayMS = 0L;
+        this.waitingForAttack = false;
     }
 
     @Override

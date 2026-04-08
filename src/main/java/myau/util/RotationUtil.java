@@ -127,6 +127,12 @@ public class RotationUtil {
         return RotationUtil.mc.theWorld.rayTraceBlocks(eyePos, targetPos);
     }
 
+    public static MovingObjectPosition rayTrace(AxisAlignedBB boundingBox) {
+        Vec3 eyePos = RotationUtil.mc.thePlayer.getPositionEyes(1.0f);
+        Vec3 targetPos = RotationUtil.clampVecToBox(eyePos, boundingBox);
+        return RotationUtil.mc.theWorld.rayTraceBlocks(eyePos, targetPos);
+    }
+
     public static MovingObjectPosition rayTrace(AxisAlignedBB boundingBox, float yaw, float pitch, double distance) {
         Vec3 eyePos = RotationUtil.mc.thePlayer.getPositionEyes(1.0f);
         Vec3 lookVec = ((IAccessorEntity) RotationUtil.mc.thePlayer).callGetVectorForRotation(pitch, yaw);

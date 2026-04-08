@@ -1,3 +1,9 @@
+/*
+ * Myau Hacked Client
+ * A free open source mixin-based injection hacked client for Minecraft using Minecraft Forge.
+ * https://github.com/suffpodiapi287/Myau-Beta
+ */
+
 package me.ksyz.accountmanager.gui;
 
 import me.ksyz.accountmanager.AccountManager;
@@ -8,6 +14,8 @@ import me.ksyz.accountmanager.utils.Notification;
 import me.ksyz.accountmanager.utils.TextFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.*;
+import net.minecraft.util.Session;
+
 import org.apache.commons.lang3.StringUtils;
 import org.lwjgl.input.Keyboard;
 
@@ -19,18 +27,13 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
 
-/*
- * This file is derived from https://github.com/ksyzov/AccountManager.
- * Originally licensed under the GNU LGPL.
- *
- * This modified version is licensed under the GNU GPL v3.
- */
 public class GuiAccountManager extends GuiScreen {
     private final GuiScreen previousScreen;
 
     private GuiButton loginButton = null;
     private GuiButton deleteButton = null;
     private GuiButton cancelButton = null;
+    private GuiButton editButton = null;
     private GuiAccountList guiAccountList = null;
     private Notification notification = null;
     private int selectedAccount = -1;
@@ -52,23 +55,28 @@ public class GuiAccountManager extends GuiScreen {
         Keyboard.enableRepeatEvents(true);
 
         buttonList.add(loginButton = new GuiButton(
-                0, width / 2 - 150, height - 52, 95, 20, "Login"
+                0, width / 2 - 200, height - 52, 90, 20, "Login"
         ));
         buttonList.add(new GuiButton(
-                1, width / 2 - 50, height - 52, 95, 20, "Add"
+                1, width / 2 - 100, height - 52, 90, 20, "Add Offline"
         ));
         buttonList.add(new GuiButton(
-                4, width / 2 + 50, height - 52, 95, 20, "Session"
+                6, width / 2, height - 52, 120, 20, "Add Microsoft"
         ));
-
+        buttonList.add(new GuiButton(
+                4, width / 2 + 125, height - 52, 90, 20, "Session"
+        ));
         buttonList.add(deleteButton = new GuiButton(
-                2, width / 2 - 150, height - 28, 95, 20, "Delete"
+                2, width / 2 - 100, height - 28, 90, 20, "Delete"
         ));
         buttonList.add(cancelButton = new GuiButton(
-                3, width / 2 + 50, height - 28, 95, 20, "Cancel"
+                3, width / 2 + 125, height - 28, 90, 20, "Cancel"
         ));
         buttonList.add(new GuiButton(
-                5, width / 2 - 50, height - 28, 95, 20, "Add Token"
+                5, width / 2, height - 28, 120, 20, "Add Token"
+        ));
+        buttonList.add(editButton = new GuiButton(
+                7, width / 2 - 200, height - 28, 90, 20, "Edit"
         ));
 
         guiAccountList = new GuiAccountList(mc);
@@ -88,10 +96,31 @@ public class GuiAccountManager extends GuiScreen {
 
     @Override
     public void updateScreen() {
-        if (loginButton != null && deleteButton != null) {
-            loginButton.enabled = deleteButton.enabled = selectedAccount >= 0;
+        if (loginButton != null && deleteButton != null && editButton != null) {
+            if (selectedAccount >= 0) {
+                Account acc = AccountManager.accounts.get(selectedAccount);
+
+                loginButton.enabled = true;
+                deleteButton.enabled = true;
+
+                if (StringUtils.isBlank(acc.getAccessToken())) {
+                    // OFFLINE
+                    loginButton.displayString = "Use Offline";
+                    editButton.enabled = true;
+                } else {
+                    // MICROSOFT
+                    loginButton.displayString = "Login";
+                    editButton.enabled = false;
+                }
+            } else {
+                loginButton.enabled = false;
+                deleteButton.enabled = false;
+                editButton.enabled = false;
+            }
+
             if (task != null && !task.isDone()) {
                 loginButton.enabled = false;
+                editButton.enabled = false;
             }
         }
     }
@@ -194,6 +223,30 @@ public class GuiAccountManager extends GuiScreen {
                             executor = Executors.newSingleThreadExecutor();
                         }
                         Account account = AccountManager.accounts.get(selectedAccount);
+
+                        // ===============================
+                        // OFFLINE LOGIN
+                        // ===============================
+                        if (StringUtils.isBlank(account.getAccessToken())) {
+                            Session offlineSession = new Session(
+                                    account.getUsername(),
+                                    "0",
+                                    "0",
+                                    "legacy"
+                            );
+
+                            SessionManager.set(offlineSession);
+
+                            notification = new Notification(
+                                    TextFormatting.translate("&aUsing offline account: &f" + account.getUsername()),
+                                    3000L
+                            ); 
+                            return;
+                        }
+
+                        // ===============================
+                        // MICROSOFT LOGIN
+                        // ===============================
                         String username = StringUtils.isBlank(account.getUsername()) ? "???" : account.getUsername();
                         AtomicReference<String> refreshToken = new AtomicReference<>("");
                         AtomicReference<String> accessToken = new AtomicReference<>("");
@@ -273,8 +326,8 @@ public class GuiAccountManager extends GuiScreen {
                     }
                 }
                 break;
-                case 1: { // Add
-                    mc.displayGuiScreen(new GuiMicrosoftAuth(previousScreen));
+                case 1: { // Add Offline
+                    mc.displayGuiScreen(new GuiAddOfflineAccount(this));
                 }
                 break;
                 case 2: { // Delete
@@ -296,6 +349,21 @@ public class GuiAccountManager extends GuiScreen {
                 break;
                 case 5:{
                     mc.displayGuiScreen(new GuiAddToken(this));
+                }
+                break;
+                case 6: { // Add Microsoft Account
+                    mc.displayGuiScreen(new GuiMicrosoftAuth(this));
+                }
+                break;
+                case 7: { // Edit Offline Account
+                    Account acc = AccountManager.accounts.get(selectedAccount);
+
+                    // Safety: only allow editing offline accounts.
+                    if (!StringUtils.isBlank(acc.getAccessToken())) {
+                        return;
+                    }
+
+                    mc.displayGuiScreen(new GuiEditOfflineAccount(this, acc));
                 }
                 break;
                 default: {
@@ -357,28 +425,43 @@ public class GuiAccountManager extends GuiScreen {
             FontRenderer fr = GuiAccountManager.this.fontRendererObj;
             Account account = AccountManager.accounts.get(entryID);
 
+            boolean isOffline = StringUtils.isBlank(account.getAccessToken());
+
             String username = account.getUsername();
             if (StringUtils.isBlank(username)) {
                 username = "&7&l?";
-            } else if (account.getAccessToken().equals(SessionManager.get().getToken())) {
-                username = String.format("&a&l%s", username);
-            } else if (username.equals(SessionManager.get().getUsername())) {
-                username = String.format("&a%s", username);
+            } else {
+                if (isOffline) {
+                    // OFFLINE account
+                    username = String.format("&7[OFFLINE] %s", username);
+                } else {
+                    // Microsoft account
+                    username = String.format("&b[MS] %s", username);
+                }
+
+                // Highlight currently logged-in account
+                if (!isOffline && account.getAccessToken().equals(SessionManager.get().getToken())) {
+                    username = String.format("&a&l%s", username);
+                } else if (username.contains(SessionManager.get().getUsername())) {
+                    username = String.format("&a%s", username);
+                }
             }
-            username = TextFormatting.translate(
-                    String.format("&r%s&r", username)
-            );
+
+            username = TextFormatting.translate("&r" + username + "&r");
+
             GuiAccountManager.this.drawString(
                     fr, username, x + 2, y + 2, -1
             );
 
+            // Unban status display.
             long currentTime = System.currentTimeMillis();
             long unbanTime = account.getUnban();
             String unban;
+
             if (unbanTime < 0L) {
-                unban = "&4&l⚠";
+                unban = "&4&lX";
             } else if (unbanTime <= currentTime) {
-                unban = "&2&l✔";
+                unban = "&2&lOK";
             } else {
                 long diff = unbanTime - currentTime;
                 long s = (diff / 1000L) % 60L;
@@ -393,13 +476,16 @@ public class GuiAccountManager extends GuiScreen {
                         s > 0L ? String.format(" %ds", s) : ""
                 );
                 unban = unban.trim();
-                unban = String.format("%s &c&l⚠", unban);
+                unban = String.format("%s &c&l!", unban);
             }
-            unban = TextFormatting.translate(
-                    String.format("&r%s&r", unban)
-            );
+
+            unban = TextFormatting.translate("&r" + unban + "&r");
+
             GuiAccountManager.this.drawString(
-                    fr, unban, x + getListWidth() - 5 - fr.getStringWidth(unban), y + 2, -1
+                    fr, unban,
+                    x + getListWidth() - 5 - fr.getStringWidth(unban),
+                    y + 2,
+                    -1
             );
         }
     }

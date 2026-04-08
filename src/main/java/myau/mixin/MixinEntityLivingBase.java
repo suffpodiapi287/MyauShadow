@@ -1,10 +1,12 @@
 package myau.mixin;
 
 import myau.Myau;
+import myau.config.AnimationConfig;
 import myau.event.EventManager;
 import myau.events.StrafeEvent;
 import myau.management.RotationState;
 import myau.module.modules.Jesus;
+import myau.module.modules.HitFX;
 import net.minecraft.client.entity.EntityPlayerSP;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.entity.Entity;
@@ -12,7 +14,9 @@ import net.minecraft.entity.EntityLivingBase;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Overwrite;
 import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.Redirect;
 
@@ -74,5 +78,41 @@ public abstract class MixinEntityLivingBase extends MixinEntity {
             }
         }
         return float1;
+    }
+
+    @ModifyArg(
+            method = {"handleStatusUpdate"},
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lnet/minecraft/entity/EntityLivingBase;playSound(Ljava/lang/String;FF)V"
+            ),
+            index = 0
+    )
+    private String handleStatusUpdate(String soundName) {
+        if (Myau.moduleManager == null) {
+            return soundName;
+        }
+
+        HitFX hitFX = (HitFX) Myau.moduleManager.modules.get(HitFX.class);
+        if (hitFX == null) {
+            return soundName;
+        }
+
+        return hitFX.getReplacementHurtSound((EntityLivingBase) ((Object) this), soundName);
+    }
+
+    /**
+     * @author animations-1.6 (syuto), integrated by Uzi
+     * @reason Custom swing speed
+     */
+    @Overwrite
+    private int getArmSwingAnimationEnd() {
+        if (!AnimationConfig.isEnabled()) {
+            return 6;
+        }
+
+        AnimationConfig.sync();
+        int percent = Math.max(0, Math.min(AnimationConfig.getSwingSpeed(), 100));
+        return (int) (6.0D + (double) percent / 100.0D * 14.0D);
     }
 }

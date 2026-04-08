@@ -268,16 +268,19 @@ public class HUD extends Module {
             }
             if (this.blinkTimer.getValue()) {
                 BlinkModules blinkingModule = Myau.blinkManager.getBlinkingModule();
-                if (blinkingModule != BlinkModules.NONE && blinkingModule != BlinkModules.AUTO_BLOCK) {
-                    long movementPacketSize = Myau.blinkManager.countMovement();
-                    if (movementPacketSize > 0L) {
+                boolean renderManualBlink = Myau.blinkManager.isManualBlinking();
+                if (renderManualBlink || blinkingModule != BlinkModules.NONE && blinkingModule != BlinkModules.AUTO_BLOCK) {
+                    long movementPacketSize = renderManualBlink ? Myau.blinkManager.countManualMovement() : Myau.blinkManager.countMovement();
+                    int queuedPackets = renderManualBlink ? Myau.blinkManager.countManualQueuedPackets() : Myau.blinkManager.countQueuedPackets();
+                    int displayCount = movementPacketSize > 0L ? (int) movementPacketSize : queuedPackets;
+                    if (displayCount > 0) {
                         GlStateManager.enableBlend();
                         GlStateManager.blendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
                         mc.fontRendererObj
                                 .drawString(
-                                        String.valueOf(movementPacketSize),
+                                        String.valueOf(displayCount),
                                         (float) new ScaledResolution(mc).getScaledWidth() / 2.0F / this.scale.getValue()
-                                                - (float) mc.fontRendererObj.getStringWidth(String.valueOf(movementPacketSize)) / 2.0F,
+                                                - (float) mc.fontRendererObj.getStringWidth(String.valueOf(displayCount)) / 2.0F,
                                         (float) new ScaledResolution(mc).getScaledHeight() / 5.0F * 3.0F / this.scale.getValue(),
                                         this.getColor(l, offset).getRGB() & 16777215 | -1090519040,
                                         this.shadow.getValue()

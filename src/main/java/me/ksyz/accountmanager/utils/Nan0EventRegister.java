@@ -1,3 +1,9 @@
+/*
+ * Myau Hacked Client
+ * A free open source mixin-based injection hacked client for Minecraft using Minecraft Forge.
+ * https://github.com/suffpodiapi287/Myau-Beta
+ */
+
 package me.ksyz.accountmanager.utils;
 
 import com.google.common.reflect.TypeToken;

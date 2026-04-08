@@ -1,3 +1,9 @@
+/*
+ * Myau Hacked Client
+ * A free open source mixin-based injection hacked client for Minecraft using Minecraft Forge.
+ * https://github.com/suffpodiapi287/Myau-Beta
+ */
+
 package me.ksyz.accountmanager.auth;
 
 import com.google.gson.*;
@@ -35,13 +41,6 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
-/*
- * This file is derived from https://github.com/ksyzov/AccountManager.
- * Originally licensed under the GNU LGPL.
- *
- * This modified version is licensed under the GNU GPL v3.
- */
-// Based on Auth Me (https://github.com/axieum/authme)
 public final class MicrosoftAuth {
     private static CloseableHttpClient createTrustedHttpClient() {
         try {

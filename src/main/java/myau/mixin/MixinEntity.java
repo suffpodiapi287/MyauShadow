@@ -4,6 +4,7 @@ import myau.Myau;
 import myau.event.EventManager;
 import myau.events.KnockbackEvent;
 import myau.events.SafeWalkEvent;
+import myau.management.ITruePositionEntity;
 import net.minecraft.client.entity.EntityPlayerSP;
 import net.minecraft.entity.Entity;
 import net.minecraft.world.World;
@@ -18,7 +19,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @SideOnly(Side.CLIENT)
 @Mixin(value = {Entity.class}, priority = 9999)
-public abstract class MixinEntity {
+public abstract class MixinEntity implements ITruePositionEntity {
     @Shadow
     public World worldObj;
     @Shadow
@@ -43,6 +44,14 @@ public abstract class MixinEntity {
     public float prevRotationPitch;
     @Shadow
     public boolean onGround;
+
+    private double lerpX;
+    private double lerpY;
+    private double lerpZ;
+    private double trueX;
+    private double trueY;
+    private double trueZ;
+    private boolean truePosition;
 
     @Shadow
     public boolean isRiding() {
@@ -92,5 +101,75 @@ public abstract class MixinEntity {
         } else {
             return boolean1;
         }
+    }
+
+    @Override
+    public double getLerpX() {
+        return this.lerpX;
+    }
+
+    @Override
+    public void setLerpX(double value) {
+        this.lerpX = value;
+    }
+
+    @Override
+    public double getLerpY() {
+        return this.lerpY;
+    }
+
+    @Override
+    public void setLerpY(double value) {
+        this.lerpY = value;
+    }
+
+    @Override
+    public double getLerpZ() {
+        return this.lerpZ;
+    }
+
+    @Override
+    public void setLerpZ(double value) {
+        this.lerpZ = value;
+    }
+
+    @Override
+    public double getTrueX() {
+        return this.trueX;
+    }
+
+    @Override
+    public void setTrueX(double value) {
+        this.trueX = value;
+    }
+
+    @Override
+    public double getTrueY() {
+        return this.trueY;
+    }
+
+    @Override
+    public void setTrueY(double value) {
+        this.trueY = value;
+    }
+
+    @Override
+    public double getTrueZ() {
+        return this.trueZ;
+    }
+
+    @Override
+    public void setTrueZ(double value) {
+        this.trueZ = value;
+    }
+
+    @Override
+    public boolean hasTruePosition() {
+        return this.truePosition;
+    }
+
+    @Override
+    public void setTruePosition(boolean value) {
+        this.truePosition = value;
     }
 }

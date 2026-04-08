@@ -6,6 +6,7 @@ import myau.Myau;
 import myau.event.EventManager;
 import myau.event.types.EventType;
 import myau.events.PacketEvent;
+import myau.util.PacketUtil;
 import net.minecraft.network.NetworkManager;
 import net.minecraft.network.Packet;
 import net.minecraft.network.play.INetHandlerPlayClient;
@@ -47,6 +48,9 @@ public abstract class MixinNetworkManager {
     )
     private void sendPacket(Packet<?> packet, CallbackInfo callbackInfo) {
         if (!packet.getClass().getName().startsWith("net.minecraft.network.play.server")) {
+            if (PacketUtil.shouldIgnoreEvents()) {
+                return;
+            }
             PacketEvent event = new PacketEvent(EventType.SEND, packet);
             EventManager.call(event);
             if (event.isCancelled()) {
@@ -54,7 +58,7 @@ public abstract class MixinNetworkManager {
             } else if (Myau.playerStateManager != null && Myau.blinkManager != null && Myau.lagManager != null) {
                 if (!Myau.lagManager.isFlushing()) {
                     Myau.playerStateManager.handlePacket(packet);
-                    if (Myau.blinkManager.isBlinking()) {
+                    if (Myau.blinkManager.isSendBlinking()) {
                         if (Myau.blinkManager.offerPacket(packet)) {
                             callbackInfo.cancel();
                             return;
@@ -80,10 +84,17 @@ public abstract class MixinNetworkManager {
             CallbackInfo callbackInfo
     ) {
         if (!packet.getClass().getName().startsWith("net.minecraft.network.play.server")) {
-            if (Myau.playerStateManager != null && Myau.blinkManager != null && Myau.lagManager != null) {
+            if (PacketUtil.shouldIgnoreEvents()) {
+                return;
+            }
+            PacketEvent event = new PacketEvent(EventType.SEND, packet);
+            EventManager.call(event);
+            if (event.isCancelled()) {
+                callbackInfo.cancel();
+            } else if (Myau.playerStateManager != null && Myau.blinkManager != null && Myau.lagManager != null) {
                 if (!Myau.lagManager.isFlushing()) {
                     Myau.playerStateManager.handlePacket(packet);
-                    if (Myau.blinkManager.isBlinking()) {
+                    if (Myau.blinkManager.isSendBlinking()) {
                         if (Myau.blinkManager.offerPacket(packet)) {
                             callbackInfo.cancel();
                             return;

@@ -7,6 +7,7 @@ import com.google.gson.JsonParser;
 import myau.Myau;
 import myau.module.Module;
 import myau.module.modules.*;
+import myau.ui.BlackStyle;
 import myau.ui.components.CategoryComponent;
 import net.minecraft.client.gui.GuiScreen;
 import org.lwjgl.input.Mouse;
@@ -30,7 +31,10 @@ public class ClickGui extends GuiScreen {
         List<Module> combatModules = new ArrayList<>();
         combatModules.add(Myau.moduleManager.getModule(AimAssist.class));
         combatModules.add(Myau.moduleManager.getModule(AutoClicker.class));
+        combatModules.add(Myau.moduleManager.getModule(BackTrack.class));
         combatModules.add(Myau.moduleManager.getModule(KillAura.class));
+        combatModules.add(Myau.moduleManager.getModule(FakeLag.class));
+        combatModules.add(Myau.moduleManager.getModule(ForwardTrack.class));
         combatModules.add(Myau.moduleManager.getModule(Wtap.class));
         combatModules.add(Myau.moduleManager.getModule(Velocity.class));
         combatModules.add(Myau.moduleManager.getModule(Freeze.class));
@@ -61,6 +65,7 @@ public class ClickGui extends GuiScreen {
         movementModules.add(Myau.moduleManager.getModule(AntiVoid.class));
 
         List<Module> renderModules = new ArrayList<>();
+        renderModules.add(Myau.moduleManager.getModule(Animations.class));
         renderModules.add(Myau.moduleManager.getModule(ESP.class));
         renderModules.add(Myau.moduleManager.getModule(Chams.class));
         renderModules.add(Myau.moduleManager.getModule(FullBright.class));
@@ -69,6 +74,7 @@ public class ClickGui extends GuiScreen {
         renderModules.add(Myau.moduleManager.getModule(Xray.class));
         renderModules.add(Myau.moduleManager.getModule(TargetHUD.class));
         renderModules.add(Myau.moduleManager.getModule(Indicators.class));
+        renderModules.add(Myau.moduleManager.getModule(HitFX.class));
         renderModules.add(Myau.moduleManager.getModule(BedESP.class));
         renderModules.add(Myau.moduleManager.getModule(ItemESP.class));
         renderModules.add(Myau.moduleManager.getModule(ViewClip.class));
@@ -97,6 +103,8 @@ public class ClickGui extends GuiScreen {
         miscModules.add(Myau.moduleManager.getModule(Spammer.class));
         miscModules.add(Myau.moduleManager.getModule(BedNuker.class));
         miscModules.add(Myau.moduleManager.getModule(BedTracker.class));
+        miscModules.add(Myau.moduleManager.getModule(AntiBot.class));
+        miscModules.add(Myau.moduleManager.getModule(Disabler.class));
         miscModules.add(Myau.moduleManager.getModule(LightningTracker.class));
         miscModules.add(Myau.moduleManager.getModule(NoRotate.class));
         miscModules.add(Myau.moduleManager.getModule(NickHider.class));
@@ -105,12 +113,18 @@ public class ClickGui extends GuiScreen {
         miscModules.add(Myau.moduleManager.getModule(AutoAnduril.class));
         miscModules.add(Myau.moduleManager.getModule(InventoryClicker.class));
 
+        List<Module> alertModules = new ArrayList<>();
+        alertModules.add(Myau.moduleManager.getModule(CriticalCheck.class));
+        alertModules.add(Myau.moduleManager.getModule(FlagDetector.class));
+        alertModules.add(Myau.moduleManager.getModule(HealthDebug.class));
+
         Comparator<Module> comparator = Comparator.comparing(m -> m.getName().toLowerCase());
         combatModules.sort(comparator);
         movementModules.sort(comparator);
         renderModules.sort(comparator);
         playerModules.sort(comparator);
         miscModules.sort(comparator);
+        alertModules.sort(comparator);
 
         Set<Module> registered = new HashSet<>();
         registered.addAll(combatModules);
@@ -118,6 +132,7 @@ public class ClickGui extends GuiScreen {
         registered.addAll(renderModules);
         registered.addAll(playerModules);
         registered.addAll(miscModules);
+        registered.addAll(alertModules);
 
         for (Module module : Myau.moduleManager.modules.values()) {
             if (!registered.contains(module)) {
@@ -126,32 +141,43 @@ public class ClickGui extends GuiScreen {
         }
 
         this.categoryList = new ArrayList<>();
-        int topOffset = 5;
+        int topOffset = 20;
 
 
         CategoryComponent combat = new CategoryComponent("Combat", combatModules);
+        combat.setX(96);
         combat.setY(topOffset);
         categoryList.add(combat);
-        topOffset += 20;
+        topOffset += 22;
 
         CategoryComponent movement = new CategoryComponent("Movement", movementModules);
+        movement.setX(96);
         movement.setY(topOffset);
         categoryList.add(movement);
-        topOffset += 20;
+        topOffset += 22;
 
         CategoryComponent render = new CategoryComponent("Render", renderModules);
+        render.setX(96);
         render.setY(topOffset);
         categoryList.add(render);
-        topOffset += 20;
+        topOffset += 22;
 
         CategoryComponent player = new CategoryComponent("Player", playerModules);
+        player.setX(96);
         player.setY(topOffset);
         categoryList.add(player);
-        topOffset += 20;
+        topOffset += 22;
 
         CategoryComponent misc = new CategoryComponent("Misc", miscModules);
+        misc.setX(96);
         misc.setY(topOffset);
         categoryList.add(misc);
+        topOffset += 22;
+
+        CategoryComponent alerts = new CategoryComponent("Alerts", alertModules);
+        alerts.setX(96);
+        alerts.setY(topOffset);
+        categoryList.add(alerts);
 
         loadPositions();
     }
@@ -165,90 +191,41 @@ public class ClickGui extends GuiScreen {
     }
 
     public void drawScreen(int x, int y, float p) {
-        drawRect(0, 0, this.width, this.height, new Color(0, 0, 0, 100).getRGB());
+        drawDefaultBackground();
+        drawRect(0, 0, this.width, this.height, BlackStyle.BACKDROP);
 
-        mc.fontRendererObj.drawStringWithShadow("Myau " + Myau.version, 4, this.height - 3 - mc.fontRendererObj.FONT_HEIGHT * 2, new Color(60, 162, 253).getRGB());
-        mc.fontRendererObj.drawStringWithShadow("dev, ksyz", 4, this.height - 3 - mc.fontRendererObj.FONT_HEIGHT, new Color(60, 162, 253).getRGB());
+        mc.fontRendererObj.drawStringWithShadow("MyauShadow " + Myau.version, 8, this.height - 20, new Color(225, 225, 225).getRGB());
+        mc.fontRendererObj.drawStringWithShadow("Black ClickGUI", 8, this.height - 10, new Color(170, 170, 170).getRGB());
 
         for (CategoryComponent category : categoryList) {
-            category.render(this.fontRendererObj);
             category.handleDrag(x, y);
-
-            for (Component module : category.getModules()) {
-                module.update(x, y);
-            }
+            category.update(x, y);
+            category.render(this.fontRendererObj);
         }
 
         int wheel = Mouse.getDWheel();
         if (wheel != 0) {
             int scrollDir = wheel > 0 ? 1 : -1;
-            for (CategoryComponent category : categoryList) {
-                category.onScroll(x, y, scrollDir);
+            for (int i = categoryList.size() - 1; i >= 0; i--) {
+                categoryList.get(i).onScroll(x, y, scrollDir);
             }
         }
     }
 
     public void mouseClicked(int x, int y, int mouseButton) {
-        Iterator<CategoryComponent> btnCat = categoryList.iterator();
-        while (true) {
-            CategoryComponent category;
-            do {
-                do {
-                    if (!btnCat.hasNext()) {
-                        return;
-                    }
-
-                    category = btnCat.next();
-                    if (category.insideArea(x, y) && !category.isHovered(x, y) && !category.mousePressed(x, y) && mouseButton == 0) {
-                        category.mousePressed(true);
-                        category.xx = x - category.getX();
-                        category.yy = y - category.getY();
-                    }
-
-                    if (category.mousePressed(x, y) && mouseButton == 0) {
-                        category.setOpened(!category.isOpened());
-                    }
-
-                    if (category.isHovered(x, y) && mouseButton == 0) {
-                        category.setPin(!category.isPin());
-                    }
-                } while (!category.isOpened());
-            } while (category.getModules().isEmpty());
-
-            for (Component c : category.getModules()) {
-                c.mouseDown(x, y, mouseButton);
+        for (int i = categoryList.size() - 1; i >= 0; i--) {
+            CategoryComponent category = categoryList.get(i);
+            if (category.handleClick(x, y, mouseButton)) {
+                categoryList.remove(i);
+                categoryList.add(category);
+                return;
             }
         }
-
     }
 
     public void mouseReleased(int x, int y, int mouseButton) {
-        Iterator<CategoryComponent> iterator = categoryList.iterator();
-
-        CategoryComponent categoryComponent;
-        while (iterator.hasNext()) {
-            categoryComponent = iterator.next();
-            if (mouseButton == 0) {
-                categoryComponent.mousePressed(false);
-            }
-        }
-
-        iterator = categoryList.iterator();
-
-        while (true) {
-            do {
-                do {
-                    if (!iterator.hasNext()) {
-                        return;
-                    }
-
-                    categoryComponent = iterator.next();
-                } while (!categoryComponent.isOpened());
-            } while (categoryComponent.getModules().isEmpty());
-
-            for (Component component : categoryComponent.getModules()) {
-                component.mouseReleased(x, y, mouseButton);
-            }
+        for (CategoryComponent categoryComponent : categoryList) {
+            categoryComponent.mouseReleased(x, y, mouseButton);
         }
     }
 
@@ -256,23 +233,8 @@ public class ClickGui extends GuiScreen {
         if (key == 1) {
             this.mc.displayGuiScreen(null);
         } else {
-            Iterator<CategoryComponent> btnCat = categoryList.iterator();
-
-            while (true) {
-                CategoryComponent cat;
-                do {
-                    do {
-                        if (!btnCat.hasNext()) {
-                            return;
-                        }
-
-                        cat = btnCat.next();
-                    } while (!cat.isOpened());
-                } while (cat.getModules().isEmpty());
-
-                for (Component component : cat.getModules()) {
-                    component.keyTyped(typedChar, key);
-                }
+            for (CategoryComponent cat : categoryList) {
+                cat.keyTyped(typedChar, key);
             }
         }
     }
@@ -293,6 +255,9 @@ public class ClickGui extends GuiScreen {
             pos.addProperty("y", cat.getY());
             pos.addProperty("open", cat.isOpened());
             json.add(cat.getName(), pos);
+        }
+        if (configFile.getParentFile() != null) {
+            configFile.getParentFile().mkdirs();
         }
         try (FileWriter writer = new FileWriter(configFile)) {
             new GsonBuilder().setPrettyPrinting().create().toJson(json, writer);

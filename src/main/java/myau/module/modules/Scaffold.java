@@ -246,6 +246,10 @@ public class Scaffold extends Module {
         return this.lastSlot;
     }
 
+    public boolean shouldStopSprintNow() {
+        return this.shouldStopSprint();
+    }
+
     @EventTarget(Priority.HIGH)
     public void onUpdate(UpdateEvent event) {
         if (this.isEnabled() && event.getType() == EventType.PRE) {

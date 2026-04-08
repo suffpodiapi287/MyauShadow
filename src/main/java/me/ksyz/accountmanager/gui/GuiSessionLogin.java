@@ -1,3 +1,9 @@
+/*
+ * Myau Hacked Client
+ * A free open source mixin-based injection hacked client for Minecraft using Minecraft Forge.
+ * https://github.com/suffpodiapi287/Myau-Beta
+ */
+
 package me.ksyz.accountmanager.gui;
 
 import com.google.gson.JsonObject;
@@ -16,12 +22,6 @@ import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
-/*
- * This file is derived from https://github.com/ksyzov/AccountManager.
- * Originally licensed under the GNU LGPL.
- *
- * This modified version is licensed under the GNU GPL v3.
- */
 public class GuiSessionLogin extends GuiScreen {
     private GuiScreen previousScreen;
 

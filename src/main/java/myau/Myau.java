@@ -24,10 +24,12 @@ public class Myau {
     public static String clientName = "&7[&cM&6y&ea&au&7]&r ";
     public static String version;
     public static RotationManager rotationManager;
+    public static RenderRecoveryManager renderRecoveryManager;
     public static FloatManager floatManager;
     public static BlinkManager blinkManager;
     public static DelayManager delayManager;
     public static LagManager lagManager;
+    public static TruePositionManager truePositionManager;
     public static PlayerStateManager playerStateManager;
     public static FriendManager friendManager;
     public static TargetManager targetManager;
@@ -41,10 +43,12 @@ public class Myau {
 
     public void init() {
         rotationManager = new RotationManager();
+        renderRecoveryManager = new RenderRecoveryManager();
         floatManager = new FloatManager();
         blinkManager = new BlinkManager();
         delayManager = new DelayManager();
         lagManager = new LagManager();
+        truePositionManager = new TruePositionManager();
         playerStateManager = new PlayerStateManager();
         friendManager = new FriendManager();
         targetManager = new TargetManager();
@@ -52,23 +56,28 @@ public class Myau {
         moduleManager = new ModuleManager();
         commandManager = new CommandManager();
         EventManager.register(rotationManager);
+        EventManager.register(renderRecoveryManager);
         EventManager.register(floatManager);
         EventManager.register(blinkManager);
         EventManager.register(delayManager);
         EventManager.register(lagManager);
+        EventManager.register(truePositionManager);
         EventManager.register(moduleManager);
         EventManager.register(commandManager);
         moduleManager.modules.put(AimAssist.class, new AimAssist());
         moduleManager.modules.put(AntiAFK.class, new AntiAFK());
+        moduleManager.modules.put(AntiBot.class, new AntiBot());
         moduleManager.modules.put(AntiDebuff.class, new AntiDebuff());
         moduleManager.modules.put(AntiFireball.class, new AntiFireball());
         moduleManager.modules.put(AntiObbyTrap.class, new AntiObbyTrap());
         moduleManager.modules.put(AntiObfuscate.class, new AntiObfuscate());
         moduleManager.modules.put(AntiVoid.class, new AntiVoid());
+        moduleManager.modules.put(Animations.class, new Animations());
         moduleManager.modules.put(AutoClicker.class, new AutoClicker());
         moduleManager.modules.put(AutoAnduril.class, new AutoAnduril());
         moduleManager.modules.put(AutoHeal.class, new AutoHeal());
         moduleManager.modules.put(AutoTool.class, new AutoTool());
+        moduleManager.modules.put(BackTrack.class, new BackTrack());
         moduleManager.modules.put(BedNuker.class, new BedNuker());
         moduleManager.modules.put(BedESP.class, new BedESP());
         moduleManager.modules.put(BedTracker.class, new BedTracker());
@@ -76,14 +85,21 @@ public class Myau {
         moduleManager.modules.put(Chams.class, new Chams());
         moduleManager.modules.put(ChestESP.class, new ChestESP());
         moduleManager.modules.put(ChestStealer.class, new ChestStealer());
+        moduleManager.modules.put(Disabler.class, new Disabler());
         moduleManager.modules.put(Eagle.class, new Eagle());
         moduleManager.modules.put(ESP.class, new ESP());
+        moduleManager.modules.put(FakeLag.class, new FakeLag());
         moduleManager.modules.put(FastPlace.class, new FastPlace());
         moduleManager.modules.put(Freeze.class, new Freeze());
         moduleManager.modules.put(Fly.class, new Fly());
+        moduleManager.modules.put(FlagDetector.class, new FlagDetector());
         moduleManager.modules.put(FullBright.class, new FullBright());
+        moduleManager.modules.put(ForwardTrack.class, new ForwardTrack());
         moduleManager.modules.put(GhostHand.class, new GhostHand());
         moduleManager.modules.put(GuiModule.class, new GuiModule());
+        moduleManager.modules.put(HealthDebug.class, new HealthDebug());
+        HitFX hitFX = new HitFX();
+        moduleManager.modules.put(HitFX.class, hitFX);
         moduleManager.modules.put(HitSelect.class, new HitSelect());
         moduleManager.modules.put(HUD.class, new HUD());
         moduleManager.modules.put(MoreKB.class, new MoreKB());
@@ -100,6 +116,7 @@ public class Myau {
         moduleManager.modules.put(LightningTracker.class, new LightningTracker());
         moduleManager.modules.put(LongJump.class, new LongJump());
         moduleManager.modules.put(MCF.class, new MCF());
+        moduleManager.modules.put(CriticalCheck.class, new CriticalCheck());
         moduleManager.modules.put(NameTags.class, new NameTags());
         moduleManager.modules.put(NickHider.class, new NickHider());
         moduleManager.modules.put(NoFall.class, new NoFall());
@@ -175,7 +192,7 @@ public class Myau {
             JsonObject modInfo = new JsonParser().parse(reader).getAsJsonObject();
             version = modInfo.get("version").getAsString();
         } catch (Exception e) {
-            version = "dev";
+            version = "1.0";
         }
 
         AccountManager.init();

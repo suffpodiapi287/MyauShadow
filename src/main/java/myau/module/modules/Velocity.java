@@ -5,6 +5,7 @@ import myau.Myau;
 import myau.enums.DelayModules;
 import myau.event.EventTarget;
 import myau.event.types.EventType;
+import myau.event.types.Priority;
 import myau.events.*;
 import myau.mixin.IAccessorEntity;
 import myau.module.Module;
@@ -14,8 +15,15 @@ import myau.property.properties.ModeProperty;
 import myau.property.properties.PercentProperty;
 import myau.util.ChatUtil;
 import myau.util.MoveUtil;
+import myau.util.PacketUtil;
+import myau.util.PlayerUtil;
+import myau.util.RandomUtil;
+import myau.util.TeamUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.network.play.client.C0APacketAnimation;
 import net.minecraft.network.play.server.S12PacketEntityVelocity;
 import net.minecraft.network.play.server.S19PacketEntityStatus;
 import net.minecraft.network.play.server.S27PacketExplosion;
@@ -23,6 +31,17 @@ import net.minecraft.potion.Potion;
 
 public class Velocity extends Module {
     private static final Minecraft mc = Minecraft.getMinecraft();
+    private static final int GRIM_REDUCE_WINDOW = 14;
+    private static final float GRIM_REDUCE_RANGE = 7.0F;
+    private static final int MODE_VANILLA = 0;
+    private static final int MODE_JUMP = 1;
+    private static final int MODE_DELAY = 2;
+    private static final int MODE_REVERSE = 3;
+    private static final int MODE_LEGIT_TEST = 4;
+    private static final int MODE_LEGIT = 5;
+    private static final int MODE_INTAVE_14_3_3 = 6;
+    private static final int MODE_PREDICTION_A = 7;
+    private static final int MODE_GRIM_REDUCE = 8;
 
     private int chanceCounter = 0;
     private int delayChanceCounter = 0;
@@ -34,17 +53,27 @@ public class Velocity extends Module {
 
     private boolean shouldJump = false;
     private int jumpCooldown = 0;
+    private boolean legitPending = false;
+    private boolean intave1433Pending = false;
+    private int intave1433Stage = 0;
+    private boolean predictionPending = false;
+    private boolean predictionClicked = false;
+    private int grimReduceTicks = 0;
 
-    public final ModeProperty mode = new ModeProperty("mode", 0, new String[]{"VANILLA", "JUMP", "DELAY", "REVERSE", "LEGIT_TEST"});
-    public final IntProperty delayTicks = new IntProperty("delay-ticks", 3, 1, 20, () -> this.mode.getValue() == 2);
-    public final PercentProperty delayChance = new PercentProperty("delay-chance", 100, () -> this.mode.getValue() == 2);
-    public final PercentProperty chance = new PercentProperty("chance", 100);
-    public final PercentProperty horizontal = new PercentProperty("horizontal", 0);
-    public final PercentProperty vertical = new PercentProperty("vertical", 100);
+    public final ModeProperty mode = new ModeProperty("mode", 0, new String[]{"VANILLA", "JUMP", "DELAY", "REVERSE", "LEGIT_TEST", "LEGIT", "INTAVE14_3_3", "PREDICTION_A", "GRIM_REDUCE"});
+    public final IntProperty delayTicks = new IntProperty("delay-ticks", 3, 1, 20, () -> this.mode.getValue() == MODE_DELAY);
+    public final PercentProperty delayChance = new PercentProperty("delay-chance", 100, () -> this.mode.getValue() == MODE_DELAY);
+    public final PercentProperty chance = new PercentProperty("chance", 100, this::usesChanceSetting);
+    public final PercentProperty horizontal = new PercentProperty("horizontal", 0, this::usesHorizontalVerticalSettings);
+    public final PercentProperty vertical = new PercentProperty("vertical", 100, this::usesHorizontalVerticalSettings);
     public final PercentProperty explosionHorizontal = new PercentProperty("explosions-horizontal", 100);
     public final PercentProperty explosionVertical = new PercentProperty("explosions-vertical", 100);
-    public final BooleanProperty fakeCheck = new BooleanProperty("fake-check", true);
+    public final BooleanProperty fakeCheck = new BooleanProperty("fake-check", true, this::usesFakeCheckSetting);
     public final BooleanProperty debugLog = new BooleanProperty("debug-log", false);
+    public final BooleanProperty legitDisableInAir = new BooleanProperty("disable-in-air", true, () -> this.mode.getValue() == MODE_LEGIT);
+    public final IntProperty predictionMinClicks = new IntProperty("prediction-min-clicks", 1, 1, 20, () -> this.mode.getValue() == MODE_PREDICTION_A);
+    public final IntProperty predictionMaxClicks = new IntProperty("prediction-max-clicks", 2, 1, 20, () -> this.mode.getValue() == MODE_PREDICTION_A);
+    public final BooleanProperty grimReduceRequireSwing = new BooleanProperty("require-swing", false, () -> this.mode.getValue() == MODE_GRIM_REDUCE);
 
     private boolean isInLiquidOrWeb() {
         return mc.thePlayer.isInWater() || mc.thePlayer.isInLava() || ((IAccessorEntity) mc.thePlayer).getIsInWeb();
@@ -57,6 +86,175 @@ public class Velocity extends Module {
 
     public Velocity() {
         super("Velocity", false);
+    }
+
+    private boolean usesChanceSetting() {
+        int mode = this.mode.getValue();
+        return mode == MODE_VANILLA
+                || mode == MODE_JUMP
+                || mode == MODE_DELAY
+                || mode == MODE_REVERSE
+                || mode == MODE_LEGIT_TEST
+                || mode == MODE_LEGIT;
+    }
+
+    private boolean usesHorizontalVerticalSettings() {
+        int mode = this.mode.getValue();
+        return mode == MODE_VANILLA
+                || mode == MODE_JUMP
+                || mode == MODE_DELAY
+                || mode == MODE_REVERSE
+                || mode == MODE_LEGIT_TEST
+                || mode == MODE_LEGIT;
+    }
+
+    private boolean usesFakeCheckSetting() {
+        int mode = this.mode.getValue();
+        return mode == MODE_VANILLA
+                || mode == MODE_JUMP
+                || mode == MODE_DELAY
+                || mode == MODE_REVERSE
+                || mode == MODE_LEGIT_TEST
+                || mode == MODE_LEGIT
+                || mode == MODE_INTAVE_14_3_3
+                || mode == MODE_PREDICTION_A
+                || mode == MODE_GRIM_REDUCE;
+    }
+
+    private boolean rollChance(int chance) {
+        return Math.random() * 100.0D < (double) chance;
+    }
+
+    private boolean isNearGround(double offset) {
+        return !mc.theWorld.getCollidingBoundingBoxes(
+                mc.thePlayer,
+                mc.thePlayer.getEntityBoundingBox().offset(0.0D, -offset, 0.0D)
+        ).isEmpty();
+    }
+
+    private boolean isValidPredictionTarget(EntityLivingBase target) {
+        return this.isValidCombatTarget(target, 3.0F);
+    }
+
+    private boolean isValidCombatTarget(EntityLivingBase target, float range) {
+        if (target == null || target == mc.thePlayer || target.isDead || target.deathTime > 0) {
+            return false;
+        }
+
+        if (target instanceof EntityPlayer) {
+            EntityPlayer player = (EntityPlayer) target;
+            if (TeamUtil.isFriend(player) || TeamUtil.isBot(player) || TeamUtil.isSameTeam(player)) {
+                return false;
+            }
+        }
+
+        return mc.thePlayer.getDistanceToEntity(target) <= range;
+    }
+
+    private EntityLivingBase findPredictionTarget() {
+        if (mc.objectMouseOver != null && mc.objectMouseOver.entityHit instanceof EntityLivingBase) {
+            EntityLivingBase target = (EntityLivingBase) mc.objectMouseOver.entityHit;
+            if (this.isValidPredictionTarget(target)) {
+                return target;
+            }
+        }
+
+        EntityLivingBase nearest = null;
+        double nearestDistance = 3.0D;
+        for (Entity entity : mc.theWorld.loadedEntityList) {
+            if (entity instanceof EntityLivingBase) {
+                EntityLivingBase target = (EntityLivingBase) entity;
+                if (this.isValidPredictionTarget(target)) {
+                    double distance = mc.thePlayer.getDistanceToEntity(target);
+                    if (distance <= nearestDistance) {
+                        nearestDistance = distance;
+                        nearest = target;
+                    }
+                }
+            }
+        }
+
+        return nearest;
+    }
+
+    private boolean hasBadPacketState() {
+        return Myau.playerStateManager != null
+                && (Myau.playerStateManager.attacking
+                || Myau.playerStateManager.digging
+                || Myau.playerStateManager.placing
+                || Myau.playerStateManager.swapping
+                || Myau.playerStateManager.swinging);
+    }
+
+    private EntityLivingBase findGrimReduceTarget() {
+        KillAura killAura = (KillAura) Myau.moduleManager.modules.get(KillAura.class);
+        if (killAura != null) {
+            EntityLivingBase killAuraTarget = killAura.getTarget();
+            if (this.isValidCombatTarget(killAuraTarget, GRIM_REDUCE_RANGE)) {
+                return killAuraTarget;
+            }
+        }
+
+        if (mc.objectMouseOver != null && mc.objectMouseOver.entityHit instanceof EntityLivingBase) {
+            EntityLivingBase target = (EntityLivingBase) mc.objectMouseOver.entityHit;
+            if (this.isValidCombatTarget(target, GRIM_REDUCE_RANGE)) {
+                return target;
+            }
+        }
+
+        EntityLivingBase nearest = null;
+        double nearestDistance = GRIM_REDUCE_RANGE;
+        for (Entity entity : mc.theWorld.loadedEntityList) {
+            if (entity instanceof EntityLivingBase) {
+                EntityLivingBase target = (EntityLivingBase) entity;
+                if (this.isValidCombatTarget(target, GRIM_REDUCE_RANGE)) {
+                    double distance = mc.thePlayer.getDistanceToEntity(target);
+                    if (distance <= nearestDistance) {
+                        nearestDistance = distance;
+                        nearest = target;
+                    }
+                }
+            }
+        }
+
+        return nearest;
+    }
+
+    @EventTarget(Priority.LOWEST)
+    public void onGrimReduceUpdate(UpdateEvent event) {
+        if (!this.isEnabled()
+                || event.getType() != EventType.PRE
+                || mc.thePlayer == null
+                || mc.theWorld == null
+                || this.mode.getValue() != MODE_GRIM_REDUCE) {
+            return;
+        }
+
+        if (this.grimReduceTicks <= 0) {
+            return;
+        }
+
+        --this.grimReduceTicks;
+
+        if (mc.thePlayer.ticksExisted <= 20) {
+            return;
+        }
+
+        if (this.grimReduceRequireSwing.getValue() && !mc.thePlayer.isSwingInProgress) {
+            return;
+        }
+
+        if (this.hasBadPacketState()) {
+            return;
+        }
+
+        EntityLivingBase target = this.findGrimReduceTarget();
+        if (target == null) {
+            return;
+        }
+
+        PacketUtil.sendPacket(new C0APacketAnimation());
+        mc.playerController.attackEntity(mc.thePlayer, target);
     }
 
     @EventTarget
@@ -80,11 +278,21 @@ public class Velocity extends Module {
                 } else {
                     event.setY(mc.thePlayer.motionY);
                 }
+            } else if (this.mode.getValue() == MODE_LEGIT) {
+                this.legitPending = true;
+            } else if (this.mode.getValue() == MODE_INTAVE_14_3_3) {
+                this.intave1433Pending = true;
+                this.intave1433Stage = 0;
+            } else if (this.mode.getValue() == MODE_PREDICTION_A) {
+                this.predictionPending = true;
+                this.predictionClicked = false;
+            } else if (this.mode.getValue() == MODE_GRIM_REDUCE) {
+                this.grimReduceTicks = GRIM_REDUCE_WINDOW;
             } else {
                 this.chanceCounter = this.chanceCounter % 100 + this.chance.getValue();
                 if (this.chanceCounter >= 100) {
-                    this.jumpFlag = (this.mode.getValue() == 1 || this.mode.getValue() == 2) && event.getY() > 0.0;
-                    this.delayActive = this.mode.getValue() == 3;
+                    this.jumpFlag = (this.mode.getValue() == MODE_JUMP || this.mode.getValue() == MODE_DELAY) && event.getY() > 0.0;
+                    this.delayActive = this.mode.getValue() == MODE_REVERSE;
                     if (this.horizontal.getValue() > 0) {
                         event.setX(event.getX() * (double) this.horizontal.getValue() / 100.0);
                         event.setZ(event.getZ() * (double) this.horizontal.getValue() / 100.0);
@@ -119,7 +327,7 @@ public class Velocity extends Module {
                 this.delayActive = false;
             }
 
-            if (this.mode.getValue() == 4) {
+            if (this.mode.getValue() == MODE_LEGIT_TEST) {
                 int hurtTime = mc.thePlayer.hurtTime;
 
                 if (hurtTime >= 8) {
@@ -141,7 +349,88 @@ public class Velocity extends Module {
                     jumpCooldown--;
                 }
             }
+
+            if (this.mode.getValue() == MODE_LEGIT && this.legitPending) {
+                if (this.legitDisableInAir.getValue() && !this.isNearGround(0.5D)) {
+                    this.legitPending = false;
+                    return;
+                }
+
+                if (mc.thePlayer.maxHurtResistantTime == mc.thePlayer.hurtResistantTime && mc.thePlayer.maxHurtResistantTime != 0) {
+                    if (this.rollChance(this.chance.getValue())) {
+                        double horizontalScale = (double) this.horizontal.getValue() / 100.0D;
+                        double verticalScale = (double) this.vertical.getValue() / 100.0D;
+                        mc.thePlayer.motionX *= horizontalScale;
+                        mc.thePlayer.motionZ *= horizontalScale;
+                        mc.thePlayer.motionY *= verticalScale;
+                    }
+                    this.legitPending = false;
+                } else if (mc.thePlayer.hurtResistantTime <= 0) {
+                    this.legitPending = false;
+                }
+            }
+
+            if (this.mode.getValue() == MODE_INTAVE_14_3_3 && this.intave1433Pending) {
+                if (this.intave1433Stage == 0 && mc.thePlayer.hurtTime == 10) {
+                    mc.thePlayer.motionX *= -1.0D;
+                    mc.thePlayer.motionZ *= -1.0D;
+                    this.intave1433Stage = 1;
+                } else if (this.intave1433Stage == 1 && mc.thePlayer.hurtTime == 9 && mc.thePlayer.onGround) {
+                    mc.thePlayer.motionX *= 0.9D;
+                    mc.thePlayer.motionZ *= 0.9D;
+                    this.intave1433Pending = false;
+                    this.intave1433Stage = 0;
+                } else if (mc.thePlayer.hurtTime <= 0) {
+                    this.intave1433Pending = false;
+                    this.intave1433Stage = 0;
+                }
+            }
+
+            if (this.mode.getValue() == MODE_PREDICTION_A && this.predictionPending) {
+                if (!PlayerUtil.isJumping()
+                        && mc.thePlayer.isSprinting()
+                        && mc.thePlayer.onGround
+                        && mc.thePlayer.hurtTime == 9) {
+                    mc.thePlayer.jump();
+                    this.predictionPending = false;
+                    this.predictionClicked = false;
+                } else if (mc.thePlayer.hurtTime <= 0) {
+                    this.predictionPending = false;
+                    this.predictionClicked = false;
+                }
+            }
         }
+    }
+
+    @EventTarget
+    public void onTick(TickEvent event) {
+        if (!this.isEnabled()
+                || event.getType() != EventType.POST
+                || mc.thePlayer == null
+                || mc.theWorld == null
+                || this.mode.getValue() != MODE_PREDICTION_A
+                || !this.predictionPending
+                || this.predictionClicked
+                || mc.thePlayer.hurtTime != 10
+                || mc.thePlayer.isBlocking()) {
+            return;
+        }
+
+        EntityLivingBase target = this.findPredictionTarget();
+        if (target == null) {
+            return;
+        }
+
+        int minClicks = Math.min(this.predictionMinClicks.getValue(), this.predictionMaxClicks.getValue());
+        int maxClicks = Math.max(this.predictionMinClicks.getValue(), this.predictionMaxClicks.getValue());
+        int clicks = (int) RandomUtil.nextLong(minClicks, maxClicks);
+
+        for (int i = 0; i < clicks; ++i) {
+            mc.thePlayer.swingItem();
+            PlayerUtil.attackEntity(target);
+        }
+
+        this.predictionClicked = true;
     }
 
     @EventTarget
@@ -161,7 +450,7 @@ public class Velocity extends Module {
                 S12PacketEntityVelocity packet = (S12PacketEntityVelocity) event.getPacket();
                 if (packet.getEntityID() == mc.thePlayer.getEntityId()) {
                     LongJump longJump = (LongJump) Myau.moduleManager.modules.get(LongJump.class);
-                    if (this.mode.getValue() == 2
+                    if (this.mode.getValue() == MODE_DELAY
                             && !this.reverseFlag
                             && !this.canDelay()
                             && !this.isInLiquidOrWeb()
@@ -233,6 +522,21 @@ public class Velocity extends Module {
         this.allowNext = true;
         this.shouldJump = false;
         this.jumpCooldown = 0;
+        this.legitPending = false;
+        this.intave1433Pending = false;
+        this.intave1433Stage = 0;
+        this.predictionPending = false;
+        this.predictionClicked = false;
+        this.grimReduceTicks = 0;
+    }
+
+    @Override
+    public void verifyValue(String value) {
+        if (this.predictionMinClicks.getName().equals(value) && this.predictionMinClicks.getValue() > this.predictionMaxClicks.getValue()) {
+            this.predictionMaxClicks.setValue(this.predictionMinClicks.getValue());
+        } else if (this.predictionMaxClicks.getName().equals(value) && this.predictionMaxClicks.getValue() < this.predictionMinClicks.getValue()) {
+            this.predictionMinClicks.setValue(this.predictionMaxClicks.getValue());
+        }
     }
 
     @Override

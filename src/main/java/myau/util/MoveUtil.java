@@ -1,6 +1,7 @@
 package myau.util;
 
 import myau.Myau;
+import myau.events.StrafeEvent;
 import myau.management.RotationState;
 import myau.module.modules.TargetStrafe;
 import net.minecraft.client.Minecraft;
@@ -65,6 +66,10 @@ public class MoveUtil {
             return MathHelper.wrapAngleTo180_float(MoveUtil.mc.thePlayer.rotationYaw);
         }
         return MathHelper.wrapAngleTo180_float((float) Math.toDegrees(Math.atan2(MoveUtil.mc.thePlayer.motionZ, MoveUtil.mc.thePlayer.motionX)) - 90.0f);
+    }
+
+    public static float getAngleDifference(float first, float second) {
+        return ((first - second) % 360.0F + 540.0F) % 360.0F - 180.0F;
     }
 
     public static double getBaseMoveSpeed() {
@@ -202,5 +207,67 @@ public class MoveUtil {
             MoveUtil.mc.thePlayer.movementInput.moveForward *= 0.3f;
             MoveUtil.mc.thePlayer.movementInput.moveStrafe *= 0.3f;
         }
+    }
+
+    public static void silentRotationStrafe(StrafeEvent event, float targetYaw) {
+        int difference = (int) (((MathHelper.wrapAngleTo180_float(MoveUtil.mc.thePlayer.rotationYaw - targetYaw - 23.5F - 135.0F) + 180.0F) / 45.0F) + 1.0E-6F) & 7;
+        float strafe = event.getStrafe();
+        float forward = event.getForward();
+        float calculatedForward = 0.0F;
+        float calculatedStrafe = 0.0F;
+
+        switch (difference) {
+            case 0:
+                calculatedForward = forward;
+                calculatedStrafe = strafe;
+                break;
+            case 1:
+                calculatedForward += forward;
+                calculatedStrafe -= forward;
+                calculatedForward += strafe;
+                calculatedStrafe += strafe;
+                break;
+            case 2:
+                calculatedForward = strafe;
+                calculatedStrafe = -forward;
+                break;
+            case 3:
+                calculatedForward -= forward;
+                calculatedStrafe -= forward;
+                calculatedForward += strafe;
+                calculatedStrafe -= strafe;
+                break;
+            case 4:
+                calculatedForward = -forward;
+                calculatedStrafe = -strafe;
+                break;
+            case 5:
+                calculatedForward -= forward;
+                calculatedStrafe += forward;
+                calculatedForward -= strafe;
+                calculatedStrafe -= strafe;
+                break;
+            case 6:
+                calculatedForward = -strafe;
+                calculatedStrafe = forward;
+                break;
+            case 7:
+                calculatedForward += forward;
+                calculatedStrafe += forward;
+                calculatedForward -= strafe;
+                calculatedStrafe += strafe;
+                break;
+        }
+
+        if (calculatedForward > 1.0F || calculatedForward < -1.0F || calculatedForward < 0.9F && calculatedForward > 0.3F || calculatedForward > -0.9F && calculatedForward < -0.3F) {
+            calculatedForward *= 0.5F;
+        }
+
+        if (calculatedStrafe > 1.0F || calculatedStrafe < -1.0F || calculatedStrafe < 0.9F && calculatedStrafe > 0.3F || calculatedStrafe > -0.9F && calculatedStrafe < -0.3F) {
+            calculatedStrafe *= 0.5F;
+        }
+
+        event.setForward(calculatedForward);
+        event.setStrafe(calculatedStrafe);
     }
 }

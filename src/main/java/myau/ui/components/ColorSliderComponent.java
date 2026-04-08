@@ -1,45 +1,44 @@
 package myau.ui.components;
 
-import myau.enums.ChatColors;
 import myau.property.properties.ColorProperty;
-import myau.ui.Component;
+import myau.ui.BlackStyle;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
-import org.lwjgl.opengl.GL11;
 
 import java.awt.*;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.concurrent.atomic.AtomicInteger;
 
-public class ColorSliderComponent implements Component {
-
-    private final ModuleComponent parentModule;
+public class ColorSliderComponent extends BlackSettingComponent {
     private final ColorProperty property;
-    private int offsetY;
-    private boolean draggingHue, draggingSat, draggingBri;
-    private float hue, saturation, brightness;
+    private boolean draggingHue;
+    private boolean draggingSat;
+    private boolean draggingBri;
+    private float hue;
+    private float saturation;
+    private float brightness;
 
     public ColorSliderComponent(ColorProperty property, ModuleComponent parentModule, int offsetY) {
-        this.parentModule = parentModule;
-        this.offsetY = offsetY;
+        super(parentModule, offsetY);
         this.property = property;
 
-        Color c = new Color(property.getValue());
-        float[] hsb = Color.RGBtoHSB(c.getRed(), c.getGreen(), c.getBlue(), null);
-        hue = hsb[0];
-        saturation = hsb[1];
-        brightness = hsb[2];
+        Color color = new Color(property.getValue());
+        float[] hsb = Color.RGBtoHSB(color.getRed(), color.getGreen(), color.getBlue(), null);
+        this.hue = hsb[0];
+        this.saturation = hsb[1];
+        this.brightness = hsb[2];
     }
 
     @Override
-    public void draw(java.util.concurrent.atomic.AtomicInteger offset) {
-        int x = parentModule.category.getX() + 4;
-        int y = parentModule.category.getY() + offsetY;
-        int width = parentModule.category.getWidth() - 8;
-        GL11.glPushMatrix();
-        GL11.glScaled(0.5, 0.5, 0.5);
-        Minecraft.getMinecraft().fontRendererObj.drawStringWithShadow(property.getName().replace("-", " ") + ": " + ChatColors.formatColor(property.formatValue()), (float) (x * 2), (float) ((int) ((float) (this.parentModule.category.getY() + this.offsetY + 3) * 2.0F)), -1);
-        GL11.glPopMatrix();
+    public void draw(AtomicInteger offset) {
+        int x = left();
+        int y = this.y;
+        int width = innerWidth();
+
+        requestWidth(Math.max(146, Minecraft.getMinecraft().fontRendererObj.getStringWidth(displayName(property.getName())) + 20));
+        Minecraft.getMinecraft().fontRendererObj.drawStringWithShadow(displayName(property.getName()), x, y + 2, BlackStyle.TEXT);
+
         if (!draggingHue && !draggingSat && !draggingBri) {
             Color color = new Color(property.getValue());
             float[] hsb = Color.RGBtoHSB(color.getRed(), color.getGreen(), color.getBlue(), null);
@@ -47,14 +46,16 @@ public class ColorSliderComponent implements Component {
             saturation = hsb[1];
             brightness = hsb[2];
         }
-        int colorPreviewSize = 6;
+
+        int colorPreviewSize = 8;
         int colorPreviewX = x + width - colorPreviewSize;
         int colorPreviewY = y + 2;
         int previewColor = Color.HSBtoRGB(hue, saturation, brightness);
-        Gui.drawRect(colorPreviewX - 6, colorPreviewY, colorPreviewX + colorPreviewSize, colorPreviewY + colorPreviewSize, previewColor);
-        int baseY = y + 10;
-        int satY = baseY + 4 + 2;
-        int briY = satY + 4 + 2;
+        BlackStyle.drawBorderedRect(colorPreviewX - 2, colorPreviewY, colorPreviewX + colorPreviewSize, colorPreviewY + colorPreviewSize, BlackStyle.BORDER, previewColor);
+
+        int baseY = y + 13;
+        int satY = baseY + 6;
+        int briY = satY + 6;
         drawHueBar(x, baseY, width);
         drawPointer(x, baseY, width, hue);
         drawGradientRect(x, satY, x + width, satY + 4, Color.WHITE.getRGB(), Color.getHSBColor(hue, 1f, 1f).getRGB());
@@ -73,13 +74,15 @@ public class ColorSliderComponent implements Component {
 
     private void drawPointer(int x, int y, int width, float value) {
         int posX = x + (int) (width * value);
-        Gui.drawRect(posX - 1, y, posX, y + 4, new Color(0, 0, 0, 200).getRGB());
+        Gui.drawRect(posX - 1, y, posX + 1, y + 4, new Color(0, 0, 0, 200).getRGB());
     }
 
     @Override
     public void update(int mouseX, int mouseY) {
-        int baseX = parentModule.category.getX() + 4;
-        int width = parentModule.category.getWidth() - 8;
+        super.update(mouseX, mouseY);
+
+        int baseX = left();
+        int width = innerWidth();
         boolean changed = false;
 
         if (draggingHue) {
@@ -102,33 +105,42 @@ public class ColorSliderComponent implements Component {
     }
 
     private float getSliderValue(int mouseX, int startX, int width) {
-        double d = Math.min(width, Math.max(0, mouseX - startX));
-        return (float) roundToPrecision(d / width, 3);
+        double value = Math.min(width, Math.max(0, mouseX - startX));
+        return (float) roundToPrecision(value / width, 3);
     }
 
-    private static double roundToPrecision(double v, int precision) {
-        BigDecimal bd = new BigDecimal(v);
-        bd = bd.setScale(precision, RoundingMode.HALF_UP);
-        return bd.doubleValue();
+    private static double roundToPrecision(double value, int precision) {
+        BigDecimal decimal = new BigDecimal(value);
+        decimal = decimal.setScale(precision, RoundingMode.HALF_UP);
+        return decimal.doubleValue();
     }
 
     @Override
     public void mouseDown(int mouseX, int mouseY, int button) {
-        if (button != 0 || !parentModule.panelExpand) return;
-        int baseY = parentModule.category.getY() + offsetY + 10;
-        if (isHovered(mouseX, mouseY, baseY)) draggingHue = true;
-        else if (isHovered(mouseX, mouseY, baseY + 4 + 2)) draggingSat = true;
-        else if (isHovered(mouseX, mouseY, baseY + (4 + 2) * 2)) draggingBri = true;
+        if (button != 0 || !parentModule.panelExpand) {
+            return;
+        }
+
+        int baseY = this.y + 13;
+        if (isHovered(mouseX, mouseY, baseY)) {
+            draggingHue = true;
+        } else if (isHovered(mouseX, mouseY, baseY + 6)) {
+            draggingSat = true;
+        } else if (isHovered(mouseX, mouseY, baseY + 12)) {
+            draggingBri = true;
+        }
     }
 
     @Override
     public void mouseReleased(int x, int y, int button) {
-        draggingHue = draggingSat = draggingBri = false;
+        draggingHue = false;
+        draggingSat = false;
+        draggingBri = false;
     }
 
     private boolean isHovered(int mx, int my, int sliderY) {
-        int startX = parentModule.category.getX() + 4;
-        int endX = startX + parentModule.category.getWidth() - 8;
+        int startX = left();
+        int endX = startX + innerWidth();
         return mx >= startX && mx <= endX && my >= sliderY && my <= sliderY + 4;
     }
 
@@ -142,13 +154,8 @@ public class ColorSliderComponent implements Component {
     }
 
     @Override
-    public void setComponentStartAt(int newOffsetY) {
-        offsetY = newOffsetY;
-    }
-
-    @Override
     public int getHeight() {
-        return 10 + 17;
+        return 31;
     }
 
     private void drawGradientRect(int left, int top, int right, int bottom, int startColor, int endColor) {
@@ -160,6 +167,7 @@ public class ColorSliderComponent implements Component {
         float er = (float) (endColor >> 16 & 255) / 255.0F;
         float eg = (float) (endColor >> 8 & 255) / 255.0F;
         float eb = (float) (endColor & 255) / 255.0F;
+
         net.minecraft.client.renderer.Tessellator tessellator = net.minecraft.client.renderer.Tessellator.getInstance();
         net.minecraft.client.renderer.WorldRenderer world = tessellator.getWorldRenderer();
         org.lwjgl.opengl.GL11.glDisable(org.lwjgl.opengl.GL11.GL_TEXTURE_2D);
@@ -178,5 +186,4 @@ public class ColorSliderComponent implements Component {
         org.lwjgl.opengl.GL11.glEnable(org.lwjgl.opengl.GL11.GL_ALPHA_TEST);
         org.lwjgl.opengl.GL11.glEnable(org.lwjgl.opengl.GL11.GL_TEXTURE_2D);
     }
-
 }

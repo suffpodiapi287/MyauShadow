@@ -1,15 +1,15 @@
+/*
+ * Myau Hacked Client
+ * A free open source mixin-based injection hacked client for Minecraft using Minecraft Forge.
+ * https://github.com/suffpodiapi287/Myau-Beta
+ */
+
 package me.ksyz.accountmanager.utils;
 
 import java.awt.*;
 import java.awt.datatransfer.StringSelection;
 import java.net.URI;
 
-/*
- * This file is derived from https://github.com/ksyzov/AccountManager.
- * Originally licensed under the GNU LGPL.
- *
- * This modified version is licensed under the GNU GPL v3.
- */
 public class SystemUtils {
     public static void openWebLink(URI url) {
         try {

@@ -1,6 +1,7 @@
 package myau.util;
 
 import myau.Myau;
+import myau.module.modules.AntiBot;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.network.NetworkPlayerInfo;
@@ -59,6 +60,10 @@ public class TeamUtil {
     public static boolean isBot(EntityPlayer player) {
         if (player == TeamUtil.mc.thePlayer) {
             return false;
+        }
+        AntiBot antiBot = Myau.moduleManager == null ? null : (AntiBot) Myau.moduleManager.getModule(AntiBot.class);
+        if (antiBot != null && antiBot.isEnabled()) {
+            return antiBot.isBot(player);
         }
         NetworkPlayerInfo playerInfo = mc.getNetHandler().getPlayerInfo(player.getName());
         if (playerInfo == null) {

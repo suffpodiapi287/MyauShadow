@@ -84,4 +84,18 @@ public class Chams extends Module {
             }
         }
     }
+
+    @Override
+    public void onEnabled() {
+        if (mc.renderGlobal != null) {
+            mc.renderGlobal.loadRenderers();
+        }
+    }
+
+    @Override
+    public void onDisabled() {
+        if (mc.renderGlobal != null) {
+            mc.renderGlobal.loadRenderers();
+        }
+    }
 }

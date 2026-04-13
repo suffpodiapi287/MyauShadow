@@ -42,8 +42,8 @@ public class BackTrack extends Module {
     private double trackedServerZ;
     private long lastFlushAt;
     private long nextFlushDelay;
-    public final IntProperty minDelay = new IntProperty("min-delay", 100, 0, 1000);
-    public final IntProperty maxDelay = new IntProperty("max-delay", 200, 0, 1000);
+    public final IntProperty minDelay = new IntProperty("min-delay", 100, 0, 10000);
+    public final IntProperty maxDelay = new IntProperty("max-delay", 200, 0, 10000);
     public final FloatProperty range = new FloatProperty("range", 3.0F, 0.0F, 10.0F);
     public final BooleanProperty zoneEsp = new BooleanProperty("zone-esp", true);
     public final ModeProperty showPosition = new ModeProperty("show-position", 1, new String[]{"NONE", "DEFAULT", "HUD"});
@@ -59,6 +59,12 @@ public class BackTrack extends Module {
         }
 
         EntityLivingBase attackedEntity = (EntityLivingBase) event.getTarget();
+        EntityLivingBase killAuraTarget = this.getActiveKillAuraTarget();
+        if (killAuraTarget == null || killAuraTarget != attackedEntity) {
+            this.reset(true);
+            return;
+        }
+
         if (this.target != attackedEntity) {
             this.flushPackets();
         }
@@ -79,6 +85,11 @@ public class BackTrack extends Module {
 
         EntityLivingBase trackedTarget = this.target;
         if (trackedTarget == null) {
+            return;
+        }
+
+        if (!this.isTrackingKillAuraTarget(trackedTarget)) {
+            this.reset(true);
             return;
         }
 
@@ -132,8 +143,8 @@ public class BackTrack extends Module {
             return;
         }
 
-        if (this.target == null || !mc.theWorld.loadedEntityList.contains(this.target) || this.target.isDead || this.target.deathTime > 0) {
-            this.flushPackets();
+        if (this.target == null || !this.isTrackingKillAuraTarget(this.target) || !mc.theWorld.loadedEntityList.contains(this.target) || this.target.isDead || this.target.deathTime > 0) {
+            this.reset(true);
             return;
         }
 
@@ -160,7 +171,12 @@ public class BackTrack extends Module {
 
     @EventTarget
     public void onRender(Render3DEvent event) {
-        if (!this.isEnabled() || !this.zoneEsp.getValue() || this.showPosition.getValue() == 0 || this.target == null || !this.hasTrackedPosition) {
+        if (!this.isEnabled()
+                || !this.zoneEsp.getValue()
+                || this.showPosition.getValue() == 0
+                || this.target == null
+                || !this.hasTrackedPosition
+                || !this.isTrackingKillAuraTarget(this.target)) {
             return;
         }
 
@@ -188,7 +204,7 @@ public class BackTrack extends Module {
     }
 
     public AxisAlignedBB getNearestTrackedBox(EntityLivingBase entity) {
-        if (!this.isEnabled() || entity == null || entity != this.target || !this.hasTrackedPosition) {
+        if (!this.isEnabled() || entity == null || entity != this.target || !this.hasTrackedPosition || !this.isTrackingKillAuraTarget(entity)) {
             return null;
         }
 
@@ -210,6 +226,28 @@ public class BackTrack extends Module {
 
     private Vec3 getTrackedPosition() {
         return new Vec3(this.trackedServerX / 32.0, this.trackedServerY / 32.0, this.trackedServerZ / 32.0);
+    }
+
+    private EntityLivingBase getActiveKillAuraTarget() {
+        KillAura killAura = (KillAura) Myau.moduleManager.modules.get(KillAura.class);
+        if (killAura == null || !killAura.isEnabled() || !killAura.isAttackAllowed()) {
+            return null;
+        }
+
+        EntityLivingBase killAuraTarget = killAura.getTarget();
+        if (killAuraTarget == null
+                || mc.theWorld == null
+                || !mc.theWorld.loadedEntityList.contains(killAuraTarget)
+                || killAuraTarget.isDead
+                || killAuraTarget.deathTime > 0) {
+            return null;
+        }
+
+        return killAuraTarget;
+    }
+
+    private boolean isTrackingKillAuraTarget(EntityLivingBase entity) {
+        return entity != null && entity == this.getActiveKillAuraTarget();
     }
 
     private boolean shouldQueuePacket(Packet<?> packet, EntityLivingBase trackedTarget) {

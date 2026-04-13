@@ -16,6 +16,7 @@ import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.item.ItemStack;
 import net.minecraft.potion.Potion;
+import net.minecraft.util.AxisAlignedBB;
 import net.minecraft.util.Vec3;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
@@ -204,6 +205,39 @@ public abstract class MixinEntityRenderer {
                 list.removeIf(event::shouldSkip);
             }
         }
+    }
+
+    @Redirect(
+            method = {"getMouseOver"},
+            at = @At(
+                    value = "INVOKE",
+                    target = "Lnet/minecraft/entity/Entity;getEntityBoundingBox()Lnet/minecraft/util/AxisAlignedBB;"
+            )
+    )
+    private AxisAlignedBB getMouseOverBoundingBox(Entity entity) {
+        AxisAlignedBB currentBox = entity.getEntityBoundingBox();
+        if (Myau.moduleManager == null) {
+            return currentBox;
+        }
+
+        ForwardTrack forwardTrack = (ForwardTrack) Myau.moduleManager.modules.get(ForwardTrack.class);
+        if (forwardTrack == null || !forwardTrack.isEnabled()) {
+            return currentBox;
+        }
+
+        AxisAlignedBB trackedBox = forwardTrack.getMouseOverBoundingBox(entity);
+        if (trackedBox == null) {
+            return currentBox;
+        }
+
+        return new AxisAlignedBB(
+                Math.min(currentBox.minX, trackedBox.minX),
+                Math.min(currentBox.minY, trackedBox.minY),
+                Math.min(currentBox.minZ, trackedBox.minZ),
+                Math.max(currentBox.maxX, trackedBox.maxX),
+                Math.max(currentBox.maxY, trackedBox.maxY),
+                Math.max(currentBox.maxZ, trackedBox.maxZ)
+        );
     }
 
     @Redirect(

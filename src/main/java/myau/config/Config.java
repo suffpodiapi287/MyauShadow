@@ -84,7 +84,7 @@ public class Config {
                         }
                     }
 
-                    if (object.has("hidden")) {
+                    if (!object.has("hide") && object.has("hidden")) {
                         JsonElement hidden = object.get("hidden");
                         if (hidden != null && hidden.isJsonPrimitive()) {
                             module.setHidden(hidden.getAsBoolean());
@@ -115,7 +115,6 @@ public class Config {
                 JsonObject moduleObject = new JsonObject();
                 moduleObject.addProperty("toggled", module.isEnabled());
                 moduleObject.addProperty("key", module.getKey());
-                moduleObject.addProperty("hidden", module.isHidden());
 
                 ArrayList<Property<?>> list = Myau.propertyManager.properties.get(module.getClass());
                 if (list != null) {

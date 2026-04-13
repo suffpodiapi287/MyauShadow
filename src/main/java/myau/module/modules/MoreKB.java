@@ -4,6 +4,7 @@ import myau.event.EventTarget;
 import myau.events.AttackEvent;
 import myau.events.TickEvent;
 import myau.module.Module;
+import myau.property.properties.IntProperty;
 import myau.property.properties.BooleanProperty;
 import myau.property.properties.ModeProperty;
 import net.minecraft.client.Minecraft;
@@ -15,7 +16,8 @@ import net.minecraft.util.MovingObjectPosition;
 
 public class MoreKB extends Module {
     private static final Minecraft mc = Minecraft.getMinecraft();
-    public final ModeProperty mode = new ModeProperty("mode", 0, new String[]{"LEGIT", "LEGIT_FAST", "LESS_PACKET", "PACKET", "DOUBLE_PACKET"});
+    public final ModeProperty mode = new ModeProperty("mode", 0, new String[]{"LEGIT", "LEGIT_FAST", "LESS_PACKET", "PACKET", "DOUBLE_PACKET", "MORE_PACKET"});
+    public final IntProperty packet = new IntProperty("Packet", 5, 3, 10, () -> this.mode.getValue() == 5);
     public final BooleanProperty intelligent = new BooleanProperty("intelligent", false);
     public final BooleanProperty onlyGround = new BooleanProperty("only-ground", true);
     private boolean shouldSprintReset;
@@ -94,6 +96,13 @@ public class MoreKB extends Module {
                     mc.thePlayer.sendQueue.addToSendQueue(new C0BPacketEntityAction(mc.thePlayer, C0BPacketEntityAction.Action.STOP_SPRINTING));
                     mc.thePlayer.sendQueue.addToSendQueue(new C0BPacketEntityAction(mc.thePlayer, C0BPacketEntityAction.Action.START_SPRINTING));
                     mc.thePlayer.setSprinting(true);
+                    break;
+                case 5:
+                        for (int i = 0; i < packet.getValue(); i++) {
+                            mc.thePlayer.sendQueue.addToSendQueue(new C0BPacketEntityAction(mc.thePlayer, C0BPacketEntityAction.Action.STOP_SPRINTING));
+                            mc.thePlayer.sendQueue.addToSendQueue(new C0BPacketEntityAction(mc.thePlayer, C0BPacketEntityAction.Action.START_SPRINTING));
+                        }
+                        mc.thePlayer.setSprinting(true);
                     break;
             }
         }

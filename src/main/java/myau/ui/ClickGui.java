@@ -45,6 +45,7 @@ public class ClickGui extends GuiScreen {
         combatModules.add(Myau.moduleManager.getModule(LagRange.class));
         combatModules.add(Myau.moduleManager.getModule(HitBox.class));
         combatModules.add(Myau.moduleManager.getModule(MoreKB.class));
+        combatModules.add(Myau.moduleManager.getModule(NewTimerRange.class));
         combatModules.add(Myau.moduleManager.getModule(Refill.class));
         combatModules.add(Myau.moduleManager.getModule(HitSelect.class));
 
@@ -77,6 +78,7 @@ public class ClickGui extends GuiScreen {
         renderModules.add(Myau.moduleManager.getModule(HitFX.class));
         renderModules.add(Myau.moduleManager.getModule(BedESP.class));
         renderModules.add(Myau.moduleManager.getModule(ItemESP.class));
+        renderModules.add(Myau.moduleManager.getModule(WaterMark.class));
         renderModules.add(Myau.moduleManager.getModule(ViewClip.class));
         renderModules.add(Myau.moduleManager.getModule(NoHurtCam.class));
         renderModules.add(Myau.moduleManager.getModule(HUD.class));
@@ -111,6 +113,7 @@ public class ClickGui extends GuiScreen {
         miscModules.add(Myau.moduleManager.getModule(AntiObbyTrap.class));
         miscModules.add(Myau.moduleManager.getModule(AntiObfuscate.class));
         miscModules.add(Myau.moduleManager.getModule(AutoAnduril.class));
+        miscModules.add(Myau.moduleManager.getModule(AutoLogin.class));
         miscModules.add(Myau.moduleManager.getModule(InventoryClicker.class));
 
         List<Module> alertModules = new ArrayList<>();
@@ -194,13 +197,13 @@ public class ClickGui extends GuiScreen {
         drawDefaultBackground();
         drawRect(0, 0, this.width, this.height, BlackStyle.BACKDROP);
 
-        mc.fontRendererObj.drawStringWithShadow("MyauShadow " + Myau.version, 8, this.height - 20, new Color(225, 225, 225).getRGB());
-        mc.fontRendererObj.drawStringWithShadow("Black ClickGUI", 8, this.height - 10, new Color(170, 170, 170).getRGB());
+        ClickGuiFont.drawStringWithShadow("MyauShadow " + Myau.version, 8.0F, this.height - 20.0F, new Color(225, 225, 225).getRGB());
+        ClickGuiFont.drawStringWithShadow("Black ClickGUI", 8.0F, this.height - 10.0F, new Color(170, 170, 170).getRGB());
 
         for (CategoryComponent category : categoryList) {
             category.handleDrag(x, y);
             category.update(x, y);
-            category.render(this.fontRendererObj);
+            category.render();
         }
 
         int wheel = Mouse.getDWheel();
@@ -230,6 +233,13 @@ public class ClickGui extends GuiScreen {
     }
 
     public void keyTyped(char typedChar, int key) {
+        if (key == 1 && isBindingActive()) {
+            for (CategoryComponent cat : categoryList) {
+                cat.keyTyped(typedChar, key);
+            }
+            return;
+        }
+
         if (key == 1) {
             this.mc.displayGuiScreen(null);
         } else {
@@ -281,5 +291,15 @@ public class ClickGui extends GuiScreen {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    private boolean isBindingActive() {
+        for (CategoryComponent category : this.categoryList) {
+            if (category.isBindingActive()) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

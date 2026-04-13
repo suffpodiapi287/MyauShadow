@@ -1,7 +1,6 @@
 package myau.ui;
 
 import myau.util.RenderUtil;
-import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
 
 import java.awt.*;
@@ -30,9 +29,14 @@ public final class BlackStyle {
         Gui.drawRect(right - 1, top, right, bottom, borderColor);
     }
 
-    public static void drawPanelHeader(int x, int y, int width, int height, String title, FontRenderer renderer) {
+    public static void drawPanelHeader(int x, int y, int width, int height, String title) {
         drawBorderedRect(x, y, x + width, y + height, BORDER, HEADER);
-        renderer.drawStringWithShadow(title, x + (width - renderer.getStringWidth(title)) / 2.0F, y + (height - renderer.FONT_HEIGHT) / 2.0F, TEXT);
+        ClickGuiFont.drawStringWithShadow(
+                title,
+                x + (width - ClickGuiFont.getWidth(title)) / 2.0F,
+                y + (height - ClickGuiFont.getHeight()) / 2.0F,
+                TEXT
+        );
     }
 
     public static int blend(int first, int second, float progress) {

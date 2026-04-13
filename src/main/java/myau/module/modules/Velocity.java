@@ -14,16 +14,19 @@ import myau.property.properties.IntProperty;
 import myau.property.properties.ModeProperty;
 import myau.property.properties.PercentProperty;
 import myau.util.ChatUtil;
+import myau.util.KeyBindUtil;
 import myau.util.MoveUtil;
 import myau.util.PacketUtil;
 import myau.util.PlayerUtil;
 import myau.util.RandomUtil;
 import myau.util.TeamUtil;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.settings.GameSettings;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.network.play.client.C0APacketAnimation;
+import net.minecraft.network.play.client.C0BPacketEntityAction;
 import net.minecraft.network.play.server.S12PacketEntityVelocity;
 import net.minecraft.network.play.server.S19PacketEntityStatus;
 import net.minecraft.network.play.server.S27PacketExplosion;
@@ -35,13 +38,17 @@ public class Velocity extends Module {
     private static final float GRIM_REDUCE_RANGE = 7.0F;
     private static final int MODE_VANILLA = 0;
     private static final int MODE_JUMP = 1;
-    private static final int MODE_DELAY = 2;
-    private static final int MODE_REVERSE = 3;
-    private static final int MODE_LEGIT_TEST = 4;
-    private static final int MODE_LEGIT = 5;
-    private static final int MODE_INTAVE_14_3_3 = 6;
-    private static final int MODE_PREDICTION_A = 7;
-    private static final int MODE_GRIM_REDUCE = 8;
+    private static final int MODE_JUMP2 = 2;
+    private static final int MODE_DELAY = 3;
+    private static final int MODE_REVERSE = 4;
+    private static final int MODE_LEGIT_TEST = 5;
+    private static final int MODE_LEGIT = 6;
+    private static final int MODE_INTAVE_14_3_3 = 8;
+    private static final int MODE_PREDICTION_A = 9;
+    private static final int MODE_GRIM_REDUCE = 10;
+    private static final int STATE_BOTH = 0;
+    private static final int STATE_GROUND = 1;
+    private static final int STATE_AIR = 2;
 
     private int chanceCounter = 0;
     private int delayChanceCounter = 0;
@@ -58,9 +65,13 @@ public class Velocity extends Module {
     private int intave1433Stage = 0;
     private boolean predictionPending = false;
     private boolean predictionClicked = false;
+    private boolean smartIntaveReceivedVelocity = false;
+    private int intaveTick = 0;
+    private int intaveDamageTick = 0;
     private int grimReduceTicks = 0;
 
-    public final ModeProperty mode = new ModeProperty("mode", 0, new String[]{"VANILLA", "JUMP", "DELAY", "REVERSE", "LEGIT_TEST", "LEGIT", "INTAVE14_3_3", "PREDICTION_A", "GRIM_REDUCE"});
+    public final ModeProperty mode = new ModeProperty("mode", 0, new String[]{"VANILLA", "JUMP", "JUMP2", "DELAY", "REVERSE", "LEGIT_TEST", "LEGIT", "INTAVE14_3_3", "PREDICTION_A", "GRIM_REDUCE"});
+    public final ModeProperty velocityState = new ModeProperty("state", 0, new String[]{"BOTH", "GROUND", "AIR"});
     public final IntProperty delayTicks = new IntProperty("delay-ticks", 3, 1, 20, () -> this.mode.getValue() == MODE_DELAY);
     public final PercentProperty delayChance = new PercentProperty("delay-chance", 100, () -> this.mode.getValue() == MODE_DELAY);
     public final PercentProperty chance = new PercentProperty("chance", 100, this::usesChanceSetting);
@@ -130,6 +141,42 @@ public class Velocity extends Module {
                 mc.thePlayer,
                 mc.thePlayer.getEntityBoundingBox().offset(0.0D, -offset, 0.0D)
         ).isEmpty();
+    }
+
+    private boolean passesVelocityState() {
+        int state = this.velocityState.getValue();
+        return state == STATE_BOTH
+                || (state == STATE_GROUND ? mc.thePlayer.onGround : !mc.thePlayer.onGround);
+    }
+
+    private boolean shouldCheckVelocityState(double x, double y, double z) {
+        return y > 0.0D && (x != 0.0D || z != 0.0D);
+    }
+
+    private boolean shouldCheckVelocityState(S12PacketEntityVelocity packet) {
+        return packet.getMotionY() > 0 && (packet.getMotionX() != 0 || packet.getMotionZ() != 0);
+    }
+
+    private boolean shouldCheckVelocityState(S27PacketExplosion packet) {
+        return (mc.thePlayer.motionY + (double) packet.func_149144_d()) > 0.0D
+                && ((mc.thePlayer.motionX + (double) packet.func_149149_c()) != 0.0D
+                || (mc.thePlayer.motionZ + (double) packet.func_149147_e()) != 0.0D);
+    }
+
+    private void restoreMovementKeys() {
+        if (mc.currentScreen == null) {
+            KeyBindUtil.setKeyBindState(mc.gameSettings.keyBindForward.getKeyCode(), GameSettings.isKeyDown(mc.gameSettings.keyBindForward));
+            KeyBindUtil.setKeyBindState(mc.gameSettings.keyBindBack.getKeyCode(), GameSettings.isKeyDown(mc.gameSettings.keyBindBack));
+            KeyBindUtil.setKeyBindState(mc.gameSettings.keyBindJump.getKeyCode(), GameSettings.isKeyDown(mc.gameSettings.keyBindJump));
+        }
+    }
+
+    private void armSmartIntavePredLegit() {
+        this.legitPending = true;
+        this.predictionPending = true;
+        this.predictionClicked = false;
+        this.smartIntaveReceivedVelocity = true;
+        this.intaveTick = 0;
     }
 
     private boolean isValidPredictionTarget(EntityLivingBase target) {
@@ -264,6 +311,10 @@ public class Velocity extends Module {
             this.allowNext = true;
         } else if (!this.allowNext || !(Boolean) this.fakeCheck.getValue()) {
             this.allowNext = true;
+            if (this.shouldCheckVelocityState(event.getX(), event.getY(), event.getZ()) && !this.passesVelocityState()) {
+                this.pendingExplosion = false;
+                return;
+            }
             if (this.pendingExplosion) {
                 this.pendingExplosion = false;
                 if (this.explosionHorizontal.getValue() > 0) {
@@ -351,12 +402,10 @@ public class Velocity extends Module {
             }
 
             if (this.mode.getValue() == MODE_LEGIT && this.legitPending) {
-                if (this.legitDisableInAir.getValue() && !this.isNearGround(0.5D)) {
+                boolean canUseLegit = !this.legitDisableInAir.getValue() || this.isNearGround(0.5D);
+                if (!canUseLegit && this.mode.getValue() == MODE_LEGIT) {
                     this.legitPending = false;
-                    return;
-                }
-
-                if (mc.thePlayer.maxHurtResistantTime == mc.thePlayer.hurtResistantTime && mc.thePlayer.maxHurtResistantTime != 0) {
+                } else if (canUseLegit && mc.thePlayer.maxHurtResistantTime == mc.thePlayer.hurtResistantTime && mc.thePlayer.maxHurtResistantTime != 0) {
                     if (this.rollChance(this.chance.getValue())) {
                         double horizontalScale = (double) this.horizontal.getValue() / 100.0D;
                         double verticalScale = (double) this.vertical.getValue() / 100.0D;
@@ -449,6 +498,20 @@ public class Velocity extends Module {
             if (event.getPacket() instanceof S12PacketEntityVelocity) {
                 S12PacketEntityVelocity packet = (S12PacketEntityVelocity) event.getPacket();
                 if (packet.getEntityID() == mc.thePlayer.getEntityId()) {
+                    if (this.shouldCheckVelocityState(packet) && !this.passesVelocityState()) {
+                        return;
+                    }
+
+                    if (this.mode.getValue() == MODE_JUMP2) {
+                        if (!this.rollChance(this.chance.getValue())) {
+                            return;
+                        }
+
+                        event.setCancelled(true);
+                        this.jumpFlag = packet.getMotionY() > 0;
+                        return;
+                    }
+
                     LongJump longJump = (LongJump) Myau.moduleManager.modules.get(LongJump.class);
                     if (this.mode.getValue() == MODE_DELAY
                             && !this.reverseFlag
@@ -490,6 +553,20 @@ public class Velocity extends Module {
             } else {
                 S27PacketExplosion packet = (S27PacketExplosion) event.getPacket();
                 if (packet.func_149149_c() != 0.0F || packet.func_149144_d() != 0.0F || packet.func_149147_e() != 0.0F) {
+                    if (this.shouldCheckVelocityState(packet) && !this.passesVelocityState()) {
+                        return;
+                    }
+
+                    if (this.mode.getValue() == MODE_JUMP2) {
+                        if (!this.rollChance(this.chance.getValue())) {
+                            return;
+                        }
+
+                        event.setCancelled(true);
+                        this.jumpFlag = packet.func_149144_d() > 0.0F;
+                        return;
+                    }
+
                     this.pendingExplosion = true;
                     if (this.explosionHorizontal.getValue() == 0 || this.explosionVertical.getValue() == 0) {
                         event.setCancelled(true);
@@ -520,6 +597,11 @@ public class Velocity extends Module {
     public void onDisabled() {
         this.pendingExplosion = false;
         this.allowNext = true;
+        this.chanceCounter = 0;
+        this.delayChanceCounter = 0;
+        this.jumpFlag = false;
+        this.reverseFlag = false;
+        this.delayActive = false;
         this.shouldJump = false;
         this.jumpCooldown = 0;
         this.legitPending = false;
@@ -527,7 +609,11 @@ public class Velocity extends Module {
         this.intave1433Stage = 0;
         this.predictionPending = false;
         this.predictionClicked = false;
+        this.smartIntaveReceivedVelocity = false;
+        this.intaveTick = 0;
+        this.intaveDamageTick = 0;
         this.grimReduceTicks = 0;
+        this.restoreMovementKeys();
     }
 
     @Override

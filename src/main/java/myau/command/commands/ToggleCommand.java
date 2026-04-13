@@ -3,6 +3,9 @@ package myau.command.commands;
 import myau.Myau;
 import myau.command.Command;
 import myau.module.Module;
+import myau.module.modules.GuiModule;
+import myau.module.modules.HUD;
+import myau.notification.NotificationManager;
 import myau.util.ChatUtil;
 
 import java.util.ArrayList;
@@ -38,7 +41,13 @@ public class ToggleCommand extends Command {
                     }
                 }
                 if (changed && module.toggle()) {
-                    ChatUtil.sendFormatted(String.format("%s%s: %s&r", Myau.clientName, module.getName(), module.isEnabled() ? "&a&lON" : "&c&lOFF"));
+                    HUD hud = (HUD) Myau.moduleManager.getModule(HUD.class);
+                    boolean useNotification = hud != null && hud.toggleAlerts.getValue() && !(module instanceof GuiModule);
+                    if (useNotification) {
+                        NotificationManager.addModuleToggle(module.getName(), module.isEnabled());
+                    } else {
+                        ChatUtil.sendFormatted(String.format("%s%s: %s&r", Myau.clientName, module.getName(), module.isEnabled() ? "&a&lON" : "&c&lOFF"));
+                    }
                 }
             }
         }

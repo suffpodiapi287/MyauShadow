@@ -21,7 +21,7 @@ import java.util.ArrayList;
 import java.util.Objects;
 
 public class Myau {
-    public static String clientName = "&7[&cM&6y&ea&au&7]&r ";
+    public static String clientName = "&7[&cMyau&6Sha&adow&7]&r ";
     public static String version;
     public static RotationManager rotationManager;
     public static RenderRecoveryManager renderRecoveryManager;
@@ -76,6 +76,7 @@ public class Myau {
         moduleManager.modules.put(AutoClicker.class, new AutoClicker());
         moduleManager.modules.put(AutoAnduril.class, new AutoAnduril());
         moduleManager.modules.put(AutoHeal.class, new AutoHeal());
+        moduleManager.modules.put(AutoLogin.class, new AutoLogin());
         moduleManager.modules.put(AutoTool.class, new AutoTool());
         moduleManager.modules.put(BackTrack.class, new BackTrack());
         moduleManager.modules.put(BedNuker.class, new BedNuker());
@@ -98,8 +99,7 @@ public class Myau {
         moduleManager.modules.put(GhostHand.class, new GhostHand());
         moduleManager.modules.put(GuiModule.class, new GuiModule());
         moduleManager.modules.put(HealthDebug.class, new HealthDebug());
-        HitFX hitFX = new HitFX();
-        moduleManager.modules.put(HitFX.class, hitFX);
+        moduleManager.modules.put(HitFX.class, new HitFX());
         moduleManager.modules.put(HitSelect.class, new HitSelect());
         moduleManager.modules.put(HUD.class, new HUD());
         moduleManager.modules.put(MoreKB.class, new MoreKB());
@@ -117,6 +117,7 @@ public class Myau {
         moduleManager.modules.put(LongJump.class, new LongJump());
         moduleManager.modules.put(MCF.class, new MCF());
         moduleManager.modules.put(CriticalCheck.class, new CriticalCheck());
+        moduleManager.modules.put(NewTimerRange.class, new NewTimerRange());
         moduleManager.modules.put(NameTags.class, new NameTags());
         moduleManager.modules.put(NickHider.class, new NickHider());
         moduleManager.modules.put(NoFall.class, new NoFall());
@@ -141,6 +142,7 @@ public class Myau {
         moduleManager.modules.put(Trajectories.class, new Trajectories());
         moduleManager.modules.put(Velocity.class, new Velocity());
         moduleManager.modules.put(ViewClip.class, new ViewClip());
+        moduleManager.modules.put(WaterMark.class, new WaterMark());
         moduleManager.modules.put(Wtap.class, new Wtap());
         moduleManager.modules.put(Xray.class, new Xray());
         commandManager.commands.add(new BindCommand());
@@ -160,6 +162,10 @@ public class Myau {
         commandManager.commands.add(new VclipCommand());
         for (Module module : moduleManager.modules.values()) {
             ArrayList<Property<?>> properties = new ArrayList<>();
+            for (Property<?> property : module.getBaseProperties()) {
+                property.setOwner(module);
+                properties.add(property);
+            }
             for (final Field field : module.getClass().getDeclaredFields()) {
                 field.setAccessible(true);
                 final Object obj;

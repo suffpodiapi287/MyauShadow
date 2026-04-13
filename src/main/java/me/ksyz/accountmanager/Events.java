@@ -25,6 +25,7 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 import net.minecraftforge.fml.relauncher.ReflectionHelper;
 import org.apache.commons.lang3.StringUtils;
+import org.lwjgl.opengl.GL11;
 
 import java.lang.reflect.Field;
 
@@ -41,9 +42,14 @@ public class Events {
             String text = TextFormatting.translate(String.format(
                     "&7Username: &3%s&r", SessionManager.get().getUsername()
             ));
+            boolean wasLightingEnabled = GL11.glIsEnabled(GL11.GL_LIGHTING);
             GlStateManager.disableLighting();
             mc.currentScreen.drawString(mc.fontRendererObj, text, 3, 3, -1);
-            GlStateManager.enableLighting();
+            if (wasLightingEnabled) {
+                GlStateManager.enableLighting();
+            } else {
+                GlStateManager.disableLighting();
+            }
         }
     }
 

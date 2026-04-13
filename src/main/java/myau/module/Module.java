@@ -2,13 +2,20 @@ package myau.module;
 
 import myau.Myau;
 import myau.module.modules.HUD;
+import myau.property.Property;
+import myau.property.properties.BooleanProperty;
 import myau.util.KeyBindUtil;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 public abstract class Module {
     protected final String name;
     protected final boolean defaultEnabled;
     protected final int defaultKey;
     protected final boolean defaultHidden;
+    private final BooleanProperty hideProperty;
     protected boolean enabled;
     protected int key;
     protected boolean hidden;
@@ -22,6 +29,16 @@ public abstract class Module {
         this.enabled = this.defaultEnabled = enabled;
         this.key = this.defaultKey = 0;
         this.hidden = this.defaultHidden = hidden;
+        this.hideProperty = new BooleanProperty("hide", hidden) {
+            @Override
+            public boolean setValue(Object object) {
+                boolean changed = super.setValue(object);
+                if (changed) {
+                    Module.this.hidden = this.getValue();
+                }
+                return changed;
+            }
+        };
     }
 
     public String getName() {
@@ -83,6 +100,15 @@ public abstract class Module {
 
     public void setHidden(boolean boolean1) {
         this.hidden = boolean1;
+        if (this.hideProperty.getValue() != boolean1) {
+            this.hideProperty.setValue(boolean1);
+        }
+    }
+
+    public List<Property<?>> getBaseProperties() {
+        ArrayList<Property<?>> properties = new ArrayList<>();
+        properties.add(this.hideProperty);
+        return Collections.unmodifiableList(properties);
     }
 
     public void onEnabled() {

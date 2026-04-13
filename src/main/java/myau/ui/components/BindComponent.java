@@ -2,9 +2,9 @@ package myau.ui.components;
 
 import myau.module.modules.GuiModule;
 import myau.ui.BlackStyle;
+import myau.ui.ClickGuiFont;
 import myau.ui.dataset.BindStage;
 import myau.util.KeyBindUtil;
-import net.minecraft.client.Minecraft;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -18,7 +18,7 @@ public class BindComponent extends BlackSettingComponent {
     @Override
     public void draw(AtomicInteger offset) {
         String displayText = this.isBinding ? BindStage.binding : BindStage.bind + ": " + KeyBindUtil.getKeyName(this.parentModule.mod.getKey());
-        requestWidth(Minecraft.getMinecraft().fontRendererObj.getStringWidth(displayText) + 8);
+        requestWidth((int) Math.ceil(ClickGuiFont.getWidth(displayText)) + 8);
         renderText(displayText, this.isBinding ? BlackStyle.TEXT : BlackStyle.TEXT_MUTED);
     }
 
@@ -50,16 +50,13 @@ public class BindComponent extends BlackSettingComponent {
         }
 
         if (keyCode == 1) {
+            clearBind();
             this.isBinding = false;
             return;
         }
 
         if (keyCode == 11) {
-            if (this.parentModule.mod instanceof GuiModule) {
-                this.parentModule.mod.setKey(54);
-            } else {
-                this.parentModule.mod.setKey(0);
-            }
+            clearBind();
         } else {
             this.parentModule.mod.setKey(keyCode);
         }
@@ -69,7 +66,7 @@ public class BindComponent extends BlackSettingComponent {
 
     @Override
     public int getHeight() {
-        return 12;
+        return Math.max(12, (int) Math.ceil(ClickGuiFont.getHeight()) + 4);
     }
 
     @Override
@@ -78,6 +75,18 @@ public class BindComponent extends BlackSettingComponent {
     }
 
     private void renderText(String text, int color) {
-        Minecraft.getMinecraft().fontRendererObj.drawStringWithShadow(text, left(), this.y + 2, color);
+        ClickGuiFont.drawStringWithShadow(text, left(), this.y + 2.0F, color);
+    }
+
+    private void clearBind() {
+        if (this.parentModule.mod instanceof GuiModule) {
+            this.parentModule.mod.setKey(54);
+        } else {
+            this.parentModule.mod.setKey(0);
+        }
+    }
+
+    public boolean isBindingActive() {
+        return this.isBinding;
     }
 }

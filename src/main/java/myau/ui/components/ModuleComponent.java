@@ -5,6 +5,7 @@ import myau.module.Module;
 import myau.property.Property;
 import myau.property.properties.*;
 import myau.ui.BlackStyle;
+import myau.ui.ClickGuiFont;
 import myau.ui.Component;
 import myau.ui.dataset.impl.FloatSlider;
 import myau.ui.dataset.impl.IntSlider;
@@ -19,8 +20,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class ModuleComponent implements Component {
     private static final int ROW_HEIGHT = 15;
-    private static final int SETTINGS_WIDTH_MIN = 118;
-    private static final int SETTINGS_WIDTH_MAX = 220;
+    private static final int SETTINGS_WIDTH_MIN = 114;
+    private static final int SETTINGS_WIDTH_MAX = 204;
+    private static final int SETTINGS_PANEL_GAP = 4;
+    private static final int SCREEN_PADDING = 4;
     private static final AtomicInteger UNUSED_OFFSET = new AtomicInteger();
 
     public final Module mod;
@@ -98,7 +101,6 @@ public class ModuleComponent implements Component {
             return;
         }
 
-        Minecraft minecraft = Minecraft.getMinecraft();
         int x = this.category.getX();
         int y = this.category.getY() + this.offsetY;
         int width = this.category.getWidth();
@@ -110,11 +112,11 @@ public class ModuleComponent implements Component {
         }
 
         int textColor = this.mod.isEnabled() ? BlackStyle.TEXT : BlackStyle.TEXT_MUTED;
-        minecraft.fontRendererObj.drawStringWithShadow(this.mod.getName(), x + 6, y + (ROW_HEIGHT - minecraft.fontRendererObj.FONT_HEIGHT) / 2.0F, textColor);
+        ClickGuiFont.drawStringWithShadow(this.mod.getName(), x + 6.0F, y + (ROW_HEIGHT - ClickGuiFont.getHeight()) / 2.0F, textColor);
 
         if (!this.settings.isEmpty()) {
             String arrow = this.panelExpand ? "<" : ">";
-            minecraft.fontRendererObj.drawStringWithShadow(arrow, x + width - 9, y + (ROW_HEIGHT - minecraft.fontRendererObj.FONT_HEIGHT) / 2.0F, BlackStyle.TEXT);
+            ClickGuiFont.drawStringWithShadow(arrow, x + width - 6.0F - ClickGuiFont.getWidth(arrow), y + (ROW_HEIGHT - ClickGuiFont.getHeight()) / 2.0F, BlackStyle.TEXT);
         }
     }
 
@@ -231,19 +233,14 @@ public class ModuleComponent implements Component {
     }
 
     public int getSettingsX() {
-        ScaledResolution resolution = new ScaledResolution(Minecraft.getMinecraft());
-        int rightSide = this.category.getX() + this.category.getWidth() + 4;
-        if (rightSide + this.settingsWidth <= resolution.getScaledWidth() - 4) {
-            return rightSide;
-        }
-        return Math.max(4, this.category.getX() - this.settingsWidth - 4);
+        return this.category.getX() + this.category.getWidth() + SETTINGS_PANEL_GAP;
     }
 
     public int getSettingsY() {
         ScaledResolution resolution = new ScaledResolution(Minecraft.getMinecraft());
         int desired = this.category.getY() + this.offsetY;
-        int maxY = resolution.getScaledHeight() - getSettingsHeight() - 4;
-        return Math.max(4, Math.min(desired, maxY));
+        int maxY = resolution.getScaledHeight() - getSettingsHeight() - SCREEN_PADDING;
+        return Math.max(SCREEN_PADDING, Math.min(desired, maxY));
     }
 
     public int getSettingsWidth() {
@@ -288,5 +285,23 @@ public class ModuleComponent implements Component {
     @Override
     public boolean isVisible() {
         return true;
+    }
+
+    public int getReservedRightSpace() {
+        if (!isSettingsVisible()) {
+            return SCREEN_PADDING;
+        }
+
+        return SETTINGS_PANEL_GAP + this.settingsWidth + SCREEN_PADDING;
+    }
+
+    public boolean isBindingActive() {
+        for (Component component : this.settings) {
+            if (component instanceof BindComponent && ((BindComponent) component).isBindingActive()) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

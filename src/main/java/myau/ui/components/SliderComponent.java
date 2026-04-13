@@ -2,9 +2,9 @@ package myau.ui.components;
 
 import myau.ui.BlackStyle;
 import myau.ui.ClickGui;
+import myau.ui.ClickGuiFont;
 import myau.ui.callback.GuiInput;
 import myau.ui.dataset.Slider;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Gui;
 
 import java.math.BigDecimal;
@@ -22,9 +22,8 @@ public class SliderComponent extends BlackSettingComponent {
 
     @Override
     public void draw(AtomicInteger offset) {
-        Minecraft minecraft = Minecraft.getMinecraft();
         String text = displayName(this.slider.getName()) + ": " + this.slider.getValueString();
-        requestWidth(Math.max(128, minecraft.fontRendererObj.getStringWidth(text) + 8));
+        requestWidth(Math.max(128, (int) Math.ceil(ClickGuiFont.getWidth(text)) + 8));
 
         int trackLeft = left();
         int trackRight = right();
@@ -33,7 +32,7 @@ public class SliderComponent extends BlackSettingComponent {
         float percentage = (float) ((this.slider.getInput() - this.slider.getMin()) / Math.max(0.0001D, this.slider.getMax() - this.slider.getMin()));
         int sliderEnd = trackLeft + Math.round(trackWidth * percentage);
 
-        minecraft.fontRendererObj.drawStringWithShadow(text, trackLeft, this.y + 2, BlackStyle.TEXT);
+        ClickGuiFont.drawStringWithShadow(text, trackLeft, this.y + 2.0F, BlackStyle.TEXT);
         Gui.drawRect(trackLeft, trackY, trackRight, trackY + 2, BlackStyle.TRACK);
         Gui.drawRect(trackLeft, trackY, sliderEnd, trackY + 2, BlackStyle.TRACK_FILL);
         BlackStyle.drawCircle(sliderEnd, trackY + 1, 3.0F, BlackStyle.TEXT);
@@ -41,7 +40,7 @@ public class SliderComponent extends BlackSettingComponent {
 
     @Override
     public int getHeight() {
-        return 20;
+        return Math.max(20, (int) Math.ceil(ClickGuiFont.getHeight()) + 10);
     }
 
     @Override

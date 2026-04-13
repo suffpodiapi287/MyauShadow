@@ -2,7 +2,7 @@ package myau.ui.components;
 
 import myau.property.properties.ColorProperty;
 import myau.ui.BlackStyle;
-import net.minecraft.client.Minecraft;
+import myau.ui.ClickGuiFont;
 import net.minecraft.client.gui.Gui;
 
 import java.awt.*;
@@ -36,8 +36,8 @@ public class ColorSliderComponent extends BlackSettingComponent {
         int y = this.y;
         int width = innerWidth();
 
-        requestWidth(Math.max(146, Minecraft.getMinecraft().fontRendererObj.getStringWidth(displayName(property.getName())) + 20));
-        Minecraft.getMinecraft().fontRendererObj.drawStringWithShadow(displayName(property.getName()), x, y + 2, BlackStyle.TEXT);
+        requestWidth(Math.max(146, (int) Math.ceil(ClickGuiFont.getWidth(displayName(property.getName()))) + 20));
+        ClickGuiFont.drawStringWithShadow(displayName(property.getName()), x, y + 2.0F, BlackStyle.TEXT);
 
         if (!draggingHue && !draggingSat && !draggingBri) {
             Color color = new Color(property.getValue());
@@ -155,7 +155,7 @@ public class ColorSliderComponent extends BlackSettingComponent {
 
     @Override
     public int getHeight() {
-        return 31;
+        return Math.max(31, (int) Math.ceil(ClickGuiFont.getHeight()) + 19);
     }
 
     private void drawGradientRect(int left, int top, int right, int bottom, int startColor, int endColor) {

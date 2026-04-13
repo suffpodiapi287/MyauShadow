@@ -2,7 +2,7 @@ package myau.ui.components;
 
 import myau.property.properties.ModeProperty;
 import myau.ui.BlackStyle;
-import net.minecraft.client.Minecraft;
+import myau.ui.ClickGuiFont;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -16,16 +16,15 @@ public class ModeComponent extends BlackSettingComponent {
 
     @Override
     public void draw(AtomicInteger offset) {
-        Minecraft minecraft = Minecraft.getMinecraft();
         String value = BlackStyle.prettify(this.property.getModeString());
         String text = displayName(this.property.getName()) + ": " + value;
-        requestWidth(minecraft.fontRendererObj.getStringWidth(text) + 8);
-        minecraft.fontRendererObj.drawStringWithShadow(text, left(), this.y + 2, BlackStyle.TEXT);
+        requestWidth((int) Math.ceil(ClickGuiFont.getWidth(text)) + 8);
+        ClickGuiFont.drawStringWithShadow(text, left(), this.y + 2.0F, BlackStyle.TEXT);
     }
 
     @Override
     public int getHeight() {
-        return 12;
+        return Math.max(12, (int) Math.ceil(ClickGuiFont.getHeight()) + 4);
     }
 
     @Override

@@ -2,7 +2,7 @@ package myau.ui.components;
 
 import myau.property.properties.BooleanProperty;
 import myau.ui.BlackStyle;
-import net.minecraft.client.Minecraft;
+import myau.ui.ClickGuiFont;
 import net.minecraft.client.gui.Gui;
 
 import java.util.concurrent.atomic.AtomicInteger;
@@ -17,12 +17,11 @@ public class CheckBoxComponent extends BlackSettingComponent {
 
     @Override
     public void draw(AtomicInteger offset) {
-        Minecraft minecraft = Minecraft.getMinecraft();
         String text = displayName(this.property.getName());
-        requestWidth(minecraft.fontRendererObj.getStringWidth(text) + 18);
+        requestWidth((int) Math.ceil(ClickGuiFont.getWidth(text)) + 18);
 
         int textColor = this.property.getValue() ? BlackStyle.TEXT : BlackStyle.TEXT_DISABLED;
-        minecraft.fontRendererObj.drawStringWithShadow(text, left(), this.y + 2, textColor);
+        ClickGuiFont.drawStringWithShadow(text, left(), this.y + 2.0F, textColor);
 
         int indicatorLeft = right() - 8;
         Gui.drawRect(indicatorLeft, this.y + 2, indicatorLeft + 6, this.y + 8, this.property.getValue() ? BlackStyle.TEXT : BlackStyle.TEXT_DISABLED);
@@ -30,7 +29,7 @@ public class CheckBoxComponent extends BlackSettingComponent {
 
     @Override
     public int getHeight() {
-        return 12;
+        return Math.max(12, (int) Math.ceil(ClickGuiFont.getHeight()) + 4);
     }
 
     @Override

@@ -7,7 +7,7 @@ import myau.events.KeyEvent;
 import myau.events.TickEvent;
 import myau.module.modules.GuiModule;
 import myau.module.modules.HUD;
-import myau.util.ChatUtil;
+import myau.notification.NotificationManager;
 import myau.util.SoundUtil;
 
 import java.util.LinkedHashMap;
@@ -43,9 +43,7 @@ public class ModuleManager {
                 shouldNotify = false;
             }
             if (shouldNotify) {
-                String status = module.isEnabled() ? "&a&lON" : "&c&lOFF";
-                String message = String.format("%s%s: %s&r", Myau.clientName, module.getName(), status);
-                ChatUtil.sendFormatted(message);
+                NotificationManager.addModuleToggle(module.getName(), module.isEnabled());
             }
         }
     }

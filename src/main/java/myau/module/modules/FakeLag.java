@@ -7,6 +7,8 @@ import myau.events.LoadWorldEvent;
 import myau.events.PacketEvent;
 import myau.events.Render3DEvent;
 import myau.events.TickEvent;
+import myau.management.ITruePositionEntity;
+import myau.management.RotationState;
 import myau.mixin.IAccessorRenderManager;
 import myau.module.Module;
 import myau.property.properties.BooleanProperty;
@@ -14,10 +16,8 @@ import myau.property.properties.ColorProperty;
 import myau.property.properties.FloatProperty;
 import myau.property.properties.IntProperty;
 import myau.property.properties.PercentProperty;
-import myau.util.MoveUtil;
 import myau.util.PacketUtil;
 import myau.util.RotationUtil;
-import myau.util.TeamUtil;
 import myau.util.TimerUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.EntityPlayerSP;
@@ -69,7 +69,7 @@ public class FakeLag extends Module {
     public void onPacket(PacketEvent event) {
         if (ignoreWholeTick) return;
 
-        if (!this.isEnabled() || mc.thePlayer == null || mc.theWorld == null || event.isCancelled()) {
+        if (!this.isEnabled() || mc.thePlayer == null || mc.theWorld == null || event.isCancelled() || mc.thePlayer.isDead) {
             return;
         }
 
@@ -94,12 +94,31 @@ public class FakeLag extends Module {
             return;
         }
 
-        if (this.isBlinking()) {
+        Packet<?> packet = event.getPacket();
+
+        if (this.blinkOnAction.getValue() && packet instanceof C02PacketUseEntity) {
             this.flush(true);
             return;
         }
 
-        Packet<?> packet = event.getPacket();
+        if (this.pauseOnChest.getValue() && mc.currentScreen instanceof GuiContainer) {
+            this.flush(true);
+            return;
+        }
+
+        if (this.isIgnoredPacket(packet)) {
+            return;
+        }
+
+        if (packet instanceof C0EPacketClickWindow
+                || packet instanceof C0DPacketCloseWindow
+                || packet instanceof C07PacketPlayerDigging
+                || packet instanceof C08PacketPlayerBlockPlacement
+                || packet instanceof C12PacketUpdateSign
+                || packet instanceof C19PacketResourcePackStatus) {
+            this.flush(true);
+            return;
+        }
 
         if (event.getType() == EventType.RECEIVE) {
             if (packet instanceof S08PacketPlayerPosLook) {
@@ -121,21 +140,16 @@ public class FakeLag extends Module {
             return;
         }
 
-        if (!this.shouldQueueNow()) {
-            this.flush(false);
+        if (!this.recoilTimer.hasTimeElapsed(this.recoilTime.getValue())) {
             return;
         }
 
-        if (this.isIgnoredPacket(packet)) {
-            return;
-        }
-
-        if (this.shouldFlushOnAction(packet)) {
+        if (mc.isSingleplayer() || mc.getCurrentServerData() == null) {
             this.flush(true);
             return;
         }
 
-        if (!this.recoilTimer.hasTimeElapsed(this.recoilTime.getValue())) {
+        if (event.getType() != EventType.SEND) {
             return;
         }
 
@@ -167,18 +181,17 @@ public class FakeLag extends Module {
         }
 
         if (this.isBlinking() || mc.thePlayer.isDead || mc.thePlayer.isUsingItem()) {
-            this.flush(false);
+            this.flush(true);
             return;
         }
 
         if (this.checkNearEnemy()) {
-            this.flush(false);
+            this.flush(true);
             this.wasNearEnemy = true;
             return;
         }
 
-        if (!this.shouldQueueNow()) {
-            this.flush(false);
+        if (!this.recoilTimer.hasTimeElapsed(this.recoilTime.getValue())) {
             return;
         }
 
@@ -262,22 +275,6 @@ public class FakeLag extends Module {
         this.flush(false);
     }
 
-    private boolean shouldQueueNow() {
-        if (mc.isSingleplayer() || mc.getCurrentServerData() == null || mc.thePlayer.isDead || mc.thePlayer.isUsingItem()) {
-            return false;
-        }
-
-        if (this.maxAllowedDistToEnemy.getValue() > 0.0F && this.wasNearEnemy) {
-            return false;
-        }
-
-        if (this.pauseOnChest.getValue() && mc.currentScreen instanceof GuiContainer) {
-            return false;
-        }
-
-        return mc.thePlayer.hurtTime == 0;
-    }
-
     private boolean checkNearEnemy() {
         float minDistance = Math.min(this.minAllowedDistToEnemy.getValue(), this.maxAllowedDistToEnemy.getValue());
         float maxDistance = Math.max(this.minAllowedDistToEnemy.getValue(), this.maxAllowedDistToEnemy.getValue());
@@ -297,30 +294,14 @@ public class FakeLag extends Module {
             if (otherPlayer == mc.thePlayer || otherPlayer.isDead) {
                 continue;
             }
-            if (TeamUtil.isFriend(otherPlayer) || TeamUtil.isBot(otherPlayer) || TeamUtil.isSameTeam(otherPlayer)) {
-                continue;
-            }
 
-            double distance = RotationUtil.clampVecToBox(playerBox, otherPlayer.getPositionEyes(1.0F));
+            double distance = RotationUtil.clampVecToBox(playerBox, this.getTruePositionEyes(otherPlayer));
             if (distance >= minDistance && distance <= maxDistance) {
                 return true;
             }
         }
 
         return false;
-    }
-
-    private boolean shouldFlushOnAction(Packet<?> packet) {
-        if (this.blinkOnAction.getValue() && packet instanceof C02PacketUseEntity) {
-            return true;
-        }
-
-        return packet instanceof C0EPacketClickWindow
-                || packet instanceof C0DPacketCloseWindow
-                || packet instanceof C07PacketPlayerDigging
-                || packet instanceof C08PacketPlayerBlockPlacement
-                || packet instanceof C12PacketUpdateSign
-                || packet instanceof C19PacketResourcePackStatus;
     }
 
     private boolean isIgnoredPacket(Packet<?> packet) {
@@ -336,12 +317,22 @@ public class FakeLag extends Module {
     }
 
     private boolean isBlinking() {
-        return Myau.blinkManager != null && Myau.blinkManager.isBlinking();
+        return Myau.blinkManager != null && Myau.blinkManager.isSendBlinking();
     }
 
     private boolean isScaffoldActive() {
         Scaffold scaffold = Myau.moduleManager == null ? null : (Scaffold) Myau.moduleManager.modules.get(Scaffold.class);
-        return scaffold != null && scaffold.isEnabled();
+        return scaffold != null && scaffold.isEnabled() && RotationState.isActived() && RotationState.getPriority() == 3.0F;
+    }
+
+    private Vec3 getTruePositionEyes(EntityPlayer player) {
+        if (player instanceof ITruePositionEntity) {
+            ITruePositionEntity trueEntity = (ITruePositionEntity) player;
+            if (trueEntity.hasTruePosition()) {
+                return new Vec3(trueEntity.getTrueX(), trueEntity.getTrueY() + player.getEyeHeight(), trueEntity.getTrueZ());
+            }
+        }
+        return player.getPositionEyes(1.0F);
     }
 
     private void flush(boolean setRecoil) {

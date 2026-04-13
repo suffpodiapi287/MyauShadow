@@ -4,7 +4,6 @@ import myau.module.Module;
 import myau.ui.BlackStyle;
 import myau.ui.Component;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.ScaledResolution;
 import org.lwjgl.opengl.GL11;
@@ -17,6 +16,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class CategoryComponent {
     private static final int MAX_HEIGHT = 240;
     private static final int HEADER_HEIGHT = 18;
+    private static final int SCREEN_PADDING = 4;
 
     private final ArrayList<Component> modulesInCategory = new ArrayList<>();
     private final String categoryName;
@@ -67,6 +67,8 @@ public class CategoryComponent {
             this.animScroll = this.scroll;
         }
 
+        clampToScreen();
+
         int renderHeight = 0;
         for (Component component : modulesInCategory) {
             int componentHeight = component.getHeight();
@@ -86,8 +88,8 @@ public class CategoryComponent {
         }
     }
 
-    public void render(FontRenderer renderer) {
-        BlackStyle.drawPanelHeader(this.x, this.y, this.width, HEADER_HEIGHT, this.categoryName, renderer);
+    public void render() {
+        BlackStyle.drawPanelHeader(this.x, this.y, this.width, HEADER_HEIGHT, this.categoryName);
 
         if (!this.categoryOpened || this.modulesInCategory.isEmpty()) {
             return;
@@ -246,5 +248,39 @@ public class CategoryComponent {
     public void setLocation(int x, int y) {
         this.x = x;
         this.y = y;
+    }
+
+    public void clampToScreen() {
+        ScaledResolution resolution = new ScaledResolution(Minecraft.getMinecraft());
+        int reservedRightSpace = SCREEN_PADDING;
+        for (Component component : this.modulesInCategory) {
+            if (component instanceof ModuleComponent) {
+                reservedRightSpace = Math.max(reservedRightSpace, ((ModuleComponent) component).getReservedRightSpace());
+            }
+        }
+
+        int maxX = resolution.getScaledWidth() - this.width - reservedRightSpace;
+        this.x = BlackStyle.clamp(this.x, SCREEN_PADDING, Math.max(SCREEN_PADDING, maxX));
+
+        int maxY = resolution.getScaledHeight() - getRenderedHeight() - SCREEN_PADDING;
+        this.y = BlackStyle.clamp(this.y, SCREEN_PADDING, Math.max(SCREEN_PADDING, maxY));
+    }
+
+    private int getRenderedHeight() {
+        if (!this.categoryOpened || this.modulesInCategory.isEmpty()) {
+            return HEADER_HEIGHT;
+        }
+
+        return HEADER_HEIGHT + Math.min(this.height, MAX_HEIGHT) + 5;
+    }
+
+    public boolean isBindingActive() {
+        for (Component component : this.modulesInCategory) {
+            if (component instanceof ModuleComponent && ((ModuleComponent) component).isBindingActive()) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

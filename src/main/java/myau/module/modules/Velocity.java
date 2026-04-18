@@ -43,9 +43,9 @@ public class Velocity extends Module {
     private static final int MODE_REVERSE = 4;
     private static final int MODE_LEGIT_TEST = 5;
     private static final int MODE_LEGIT = 6;
-    private static final int MODE_INTAVE_14_3_3 = 8;
-    private static final int MODE_PREDICTION_A = 9;
-    private static final int MODE_GRIM_REDUCE = 10;
+    private static final int MODE_INTAVE_14_3_3 = 7;
+    private static final int MODE_PREDICTION_A = 8;
+    private static final int MODE_GRIM_REDUCE = 9;
     private static final int STATE_BOTH = 0;
     private static final int STATE_GROUND = 1;
     private static final int STATE_AIR = 2;

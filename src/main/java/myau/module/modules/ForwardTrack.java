@@ -5,6 +5,7 @@ import myau.mixin.IAccessorRenderManager;
 import myau.module.Module;
 import myau.property.properties.ColorProperty;
 import myau.property.properties.FloatProperty;
+import myau.property.properties.IntProperty;
 import myau.property.properties.ModeProperty;
 import myau.util.RenderUtil;
 import myau.util.TeamUtil;
@@ -21,6 +22,8 @@ import java.awt.Color;
 
 public class ForwardTrack extends Module {
     private static final Minecraft mc = Minecraft.getMinecraft();
+    public final IntProperty delay = new IntProperty("delay", 100, 0, 500);
+    public final FloatProperty range = new FloatProperty("range", 12.0F, 0.0F, 50.0F);
     public final ModeProperty espMode = new ModeProperty("esp-mode", 1, new String[]{"BOX", "MODEL", "WIREFRAME"});
     public final FloatProperty wireframeWidth = new FloatProperty("wireframe-width", 1.0F, 0.5F, 5.0F, () -> this.espMode.getValue() == 2);
     public final ColorProperty espColor = new ColorProperty("esp-color", Color.GREEN.getRGB(), () -> this.espMode.getValue() != 1);
@@ -192,6 +195,28 @@ public class ForwardTrack extends Module {
             return null;
         }
 
+        Vec3 basePosition = this.getBasePosition(entity);
+        if (basePosition == null || !this.isWithinRange(basePosition)) {
+            return null;
+        }
+
+        int forwardDelay = Math.max(0, this.delay.getValue());
+        if (forwardDelay <= 0) {
+            return basePosition;
+        }
+
+        double scale = forwardDelay / 50.0;
+        Vec3 movementPerTick = this.getMovementPerTick(entity);
+        Vec3 predictedPosition = new Vec3(
+                basePosition.xCoord + movementPerTick.xCoord * scale,
+                basePosition.yCoord + movementPerTick.yCoord * scale,
+                basePosition.zCoord + movementPerTick.zCoord * scale
+        );
+
+        return this.isWithinRange(predictedPosition) ? predictedPosition : basePosition;
+    }
+
+    private Vec3 getBasePosition(Entity entity) {
         if (!mc.isSingleplayer()) {
             Vec3 interpolatedPosition = TruePositionManager.getInterpolatedPosition(entity);
             if (interpolatedPosition != null) {
@@ -205,6 +230,23 @@ public class ForwardTrack extends Module {
         }
 
         return entity.getPositionVector();
+    }
+
+    private Vec3 getMovementPerTick(Entity entity) {
+        return new Vec3(
+                entity.posX - entity.prevPosX,
+                entity.posY - entity.prevPosY,
+                entity.posZ - entity.prevPosZ
+        );
+    }
+
+    private boolean isWithinRange(Vec3 position) {
+        if (mc.thePlayer == null || position == null) {
+            return false;
+        }
+
+        float maxRange = Math.max(0.0F, this.range.getValue());
+        return maxRange <= 0.0F || mc.thePlayer.getDistance(position.xCoord, position.yCoord, position.zCoord) <= maxRange;
     }
 
     private AxisAlignedBB buildBoundingBox(Entity entity, Vec3 position, boolean expandBorder) {

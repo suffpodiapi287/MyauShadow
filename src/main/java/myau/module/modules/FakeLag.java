@@ -67,18 +67,26 @@ public class FakeLag extends Module {
 
     @EventTarget
     public void onPacket(PacketEvent event) {
+        if (!this.isEnabled() || mc.thePlayer == null || mc.theWorld == null || event.isCancelled() || mc.thePlayer.isDead) {
+            return;
+        }
+
+        Packet<?> packet = event.getPacket();
+
+        // Keep action-blink responsive even when ignoreWholeTick is active.
+        if (this.blinkOnAction.getValue() && packet instanceof C02PacketUseEntity) {
+            this.flush(true);
+            return;
+        }
+
         if (ignoreWholeTick) return;
 
-        if (!this.isEnabled() || mc.thePlayer == null || mc.theWorld == null || event.isCancelled() || mc.thePlayer.isDead) {
+        if (this.maxAllowedDistToEnemy.getValue() > 0.0F && this.wasNearEnemy) {
             return;
         }
 
         if (this.pauseOnNoMove.getValue() && !this.isPlayerMoving()) {
             this.flush(true);
-            return;
-        }
-
-        if (this.maxAllowedDistToEnemy.getValue() > 0.0F && this.wasNearEnemy) {
             return;
         }
 
@@ -90,13 +98,6 @@ public class FakeLag extends Module {
         }
 
         if (this.isScaffoldActive()) {
-            this.flush(true);
-            return;
-        }
-
-        Packet<?> packet = event.getPacket();
-
-        if (this.blinkOnAction.getValue() && packet instanceof C02PacketUseEntity) {
             this.flush(true);
             return;
         }
@@ -180,14 +181,17 @@ public class FakeLag extends Module {
             return;
         }
 
-        if (this.isBlinking() || mc.thePlayer.isDead || mc.thePlayer.isUsingItem()) {
-            this.flush(true);
-            return;
+        if (this.maxAllowedDistToEnemy.getValue() > 0.0F) {
+            this.wasNearEnemy = false;
+            if (this.checkNearEnemy()) {
+                this.flush(true);
+                this.wasNearEnemy = true;
+                return;
+            }
         }
 
-        if (this.checkNearEnemy()) {
+        if (this.isBlinking() || mc.thePlayer.isDead || mc.thePlayer.isUsingItem()) {
             this.flush(true);
-            this.wasNearEnemy = true;
             return;
         }
 
@@ -215,7 +219,6 @@ public class FakeLag extends Module {
             this.positions.removeFirst();
         }
         ignoreWholeTick = false;
-        this.wasNearEnemy = false;
     }
 
     @EventTarget
@@ -291,11 +294,16 @@ public class FakeLag extends Module {
         );
 
         for (EntityPlayer otherPlayer : mc.theWorld.playerEntities) {
-            if (otherPlayer == mc.thePlayer || otherPlayer.isDead) {
+            if (otherPlayer == mc.thePlayer) {
                 continue;
             }
 
-            double distance = RotationUtil.clampVecToBox(playerBox, this.getTruePositionEyes(otherPlayer));
+            Vec3 trueEyes = this.getTruePositionEyes(otherPlayer);
+            if (trueEyes == null) {
+                continue;
+            }
+
+            double distance = RotationUtil.clampVecToBox(playerBox, trueEyes);
             if (distance >= minDistance && distance <= maxDistance) {
                 return true;
             }
@@ -332,7 +340,7 @@ public class FakeLag extends Module {
                 return new Vec3(trueEntity.getTrueX(), trueEntity.getTrueY() + player.getEyeHeight(), trueEntity.getTrueZ());
             }
         }
-        return player.getPositionEyes(1.0F);
+        return null;
     }
 
     private void flush(boolean setRecoil) {

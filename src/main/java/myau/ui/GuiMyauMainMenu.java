@@ -7,29 +7,39 @@ import net.minecraft.client.gui.GuiMainMenu;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.util.MathHelper;
 import net.minecraft.util.ResourceLocation;
+import org.lwjgl.opengl.GL11;
 
+import javax.imageio.ImageIO;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Map;
 
 public class GuiMyauMainMenu extends GuiMainMenu {
+    private static final int THEME_BUTTON_ID = 14;
+    private static final int MAIN_BACKGROUND_FALLBACK_WIDTH = 1920;
+    private static final int MAIN_BACKGROUND_FALLBACK_HEIGHT = 1080;
     private static final ResourceLocation MAIN_LOGO = new ResourceLocation("myau", "menu/mainmenu_logo.png");
-    private static final int MAIN_LOGO_SOURCE_WIDTH = 1023;
-    private static final int MAIN_LOGO_SOURCE_HEIGHT = 633;
-    private static final float MAIN_LOGO_DRAW_ASPECT = MAIN_LOGO_SOURCE_WIDTH / (float) MAIN_LOGO_SOURCE_HEIGHT;
+    private static final int MAIN_LOGO_FALLBACK_WIDTH = 1023;
+    private static final int MAIN_LOGO_FALLBACK_HEIGHT = 633;
     private static final float MAIN_LOGO_TOP = 12.0F;
     private static final float MAIN_LOGO_WIDTH_FACTOR = 0.42F;
-    private static final float MAIN_LOGO_MIN_WIDTH = 340.0F;
-    private static final float MAIN_LOGO_MAX_WIDTH = 640.0F;
+    private static final float MAIN_LOGO_MIN_WIDTH_FACTOR = 0.28F;
+    private static final float MAIN_LOGO_MAX_WIDTH_FACTOR = 0.52F;
     private static final float LOGO_TO_MENU_GAP = 10.0F;
     private final Map<GuiButton, Boolean> hiddenButtonStates = new IdentityHashMap<GuiButton, Boolean>();
+    private final Map<ResourceLocation, TextureSize> textureSizes = new HashMap<ResourceLocation, TextureSize>();
 
     @Override
     public void initGui() {
         super.initGui();
         replaceMainButtonsWithLiquidStyle();
         relayoutButtonsLikeLiquidBounce();
+        updateThemeButtonLabel();
         clearSplashText();
     }
 
@@ -41,6 +51,7 @@ public class GuiMyauMainMenu extends GuiMainMenu {
         restoreButtonsAfterVanillaPass();
         clearSplashText();
 
+        drawMainBackground();
         drawMenuForm();
         redrawButtons(mouseX, mouseY);
         drawMainLogo();
@@ -122,15 +133,72 @@ public class GuiMyauMainMenu extends GuiMainMenu {
             }
 
             GuiButton button = (GuiButton) object;
-            if (isMainActionButton(button.id)) {
+            if (button.visible) {
                 button.drawButton(this.mc, mouseX, mouseY);
             }
         }
     }
 
+    private void drawMainBackground() {
+        ResourceLocation backgroundResource = MenuThemeManager.getCurrentBackground();
+        TextureSize backgroundTexture = getTextureSize(
+                backgroundResource,
+                MAIN_BACKGROUND_FALLBACK_WIDTH,
+                MAIN_BACKGROUND_FALLBACK_HEIGHT
+        );
+
+        float backgroundAspect = backgroundTexture.width / (float) backgroundTexture.height;
+        float screenAspect = this.width / (float) this.height;
+        int drawWidth;
+        int drawHeight;
+
+        if (screenAspect > backgroundAspect) {
+            drawWidth = this.width;
+            drawHeight = Math.round(this.width / backgroundAspect);
+        } else {
+            drawHeight = this.height;
+            drawWidth = Math.round(this.height * backgroundAspect);
+        }
+
+        int x = (this.width - drawWidth) / 2;
+        int y = (this.height - drawHeight) / 2;
+
+        GlStateManager.pushMatrix();
+        GlStateManager.disableLighting();
+        GlStateManager.disableFog();
+        GlStateManager.enableTexture2D();
+        GlStateManager.color(1.0F, 1.0F, 1.0F, 1.0F);
+
+        this.mc.getTextureManager().bindTexture(backgroundResource);
+        boolean isUpscaling = drawWidth > backgroundTexture.width || drawHeight > backgroundTexture.height;
+        int textureFilter = isUpscaling ? GL11.GL_NEAREST : GL11.GL_LINEAR;
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, textureFilter);
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, textureFilter);
+        Gui.drawScaledCustomSizeModalRect(
+                x,
+                y,
+                0.0F,
+                0.0F,
+                backgroundTexture.width,
+                backgroundTexture.height,
+                drawWidth,
+                drawHeight,
+                backgroundTexture.width,
+                backgroundTexture.height
+        );
+
+        GlStateManager.popMatrix();
+    }
+
     private void drawMainLogo() {
+        TextureSize logoTexture = getTextureSize(
+                MAIN_LOGO,
+                MAIN_LOGO_FALLBACK_WIDTH,
+                MAIN_LOGO_FALLBACK_HEIGHT
+        );
+
         final float logoWidth = getLogoDrawWidth();
-        final float logoHeight = getLogoDrawHeight();
+        final float logoHeight = logoWidth / (logoTexture.width / (float) logoTexture.height);
         final float x = (this.width - logoWidth) / 2.0F;
         final float y = MAIN_LOGO_TOP;
 
@@ -147,12 +215,12 @@ public class GuiMyauMainMenu extends GuiMainMenu {
                 Math.round(y),
                 0.0F,
                 0.0F,
-                MAIN_LOGO_SOURCE_WIDTH,
-                MAIN_LOGO_SOURCE_HEIGHT,
+                logoTexture.width,
+                logoTexture.height,
                 Math.round(logoWidth),
                 Math.round(logoHeight),
-                MAIN_LOGO_SOURCE_WIDTH,
-                MAIN_LOGO_SOURCE_HEIGHT
+                logoTexture.width,
+                logoTexture.height
         );
 
         GlStateManager.disableBlend();
@@ -189,14 +257,19 @@ public class GuiMyauMainMenu extends GuiMainMenu {
     }
 
     private float getLogoDrawWidth() {
-        float width = Math.min(this.width * MAIN_LOGO_WIDTH_FACTOR, MAIN_LOGO_MAX_WIDTH);
-        width = Math.max(width, MAIN_LOGO_MIN_WIDTH);
-        width = Math.min(width, this.width * 0.74F);
-        return width;
+        float preferred = this.width * MAIN_LOGO_WIDTH_FACTOR;
+        float minWidth = this.width * MAIN_LOGO_MIN_WIDTH_FACTOR;
+        float maxWidth = this.width * MAIN_LOGO_MAX_WIDTH_FACTOR;
+        return MathHelper.clamp_float(preferred, minWidth, maxWidth);
     }
 
     private float getLogoDrawHeight() {
-        return getLogoDrawWidth() / MAIN_LOGO_DRAW_ASPECT;
+        TextureSize logoTexture = getTextureSize(
+                MAIN_LOGO,
+                MAIN_LOGO_FALLBACK_WIDTH,
+                MAIN_LOGO_FALLBACK_HEIGHT
+        );
+        return getLogoDrawWidth() / (logoTexture.width / (float) logoTexture.height);
     }
 
     private int getMenuBaseY() {
@@ -258,6 +331,78 @@ public class GuiMyauMainMenu extends GuiMainMenu {
 
     private boolean isMainActionButton(int id) {
         return id == 1 || id == 2 || id == 6 || id == 14 || id == 0 || id == 4;
+    }
+
+    private void updateThemeButtonLabel() {
+        GuiButton themeButton = getButtonById(THEME_BUTTON_ID);
+        if (themeButton != null) {
+            themeButton.displayString = "Theme";
+        }
+    }
+
+    private GuiButton getButtonById(int buttonId) {
+        for (Object object : this.buttonList) {
+            if (object instanceof GuiButton) {
+                GuiButton button = (GuiButton) object;
+                if (button.id == buttonId) {
+                    return button;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    @Override
+    protected void actionPerformed(GuiButton button) throws IOException {
+        if (button.id == THEME_BUTTON_ID) {
+            this.mc.displayGuiScreen(new GuiTheme(this));
+            return;
+        }
+
+        super.actionPerformed(button);
+    }
+
+    private TextureSize getTextureSize(ResourceLocation texture, int fallbackWidth, int fallbackHeight) {
+        TextureSize cached = this.textureSizes.get(texture);
+        if (cached != null) {
+            return cached;
+        }
+
+        int width = Math.max(1, fallbackWidth);
+        int height = Math.max(1, fallbackHeight);
+
+        boolean isRemoteTheme = MenuThemeManager.isRemoteTheme(texture);
+        int[] cachedRemoteSize = MenuThemeManager.getCachedTextureSize(texture);
+        if (cachedRemoteSize != null && cachedRemoteSize.length >= 2) {
+            width = Math.max(1, cachedRemoteSize[0]);
+            height = Math.max(1, cachedRemoteSize[1]);
+        } else if (!isRemoteTheme) {
+            try (InputStream stream = this.mc.getResourceManager().getResource(texture).getInputStream()) {
+                BufferedImage image = ImageIO.read(stream);
+                if (image != null && image.getWidth() > 0 && image.getHeight() > 0) {
+                    width = image.getWidth();
+                    height = image.getHeight();
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+
+        TextureSize resolved = new TextureSize(width, height);
+        if (!isRemoteTheme || cachedRemoteSize != null) {
+            this.textureSizes.put(texture, resolved);
+        }
+        return resolved;
+    }
+
+    private static final class TextureSize {
+        private final int width;
+        private final int height;
+
+        private TextureSize(int width, int height) {
+            this.width = width;
+            this.height = height;
+        }
     }
 
     private static final class GuiLiquidStyleButton extends GuiButton {

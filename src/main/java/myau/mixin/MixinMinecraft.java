@@ -7,18 +7,17 @@ import myau.event.types.EventType;
 import myau.events.*;
 import myau.module.modules.NoHitDelay;
 import myau.ui.GuiMyauMainMenu;
-import myau.util.IconUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.EntityPlayerSP;
 import net.minecraft.client.gui.GuiMainMenu;
 import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.client.gui.ScaledResolution;
 import net.minecraft.client.multiplayer.PlayerControllerMP;
 import net.minecraft.client.multiplayer.WorldClient;
 import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraftforge.fml.relauncher.Side;
 import net.minecraftforge.fml.relauncher.SideOnly;
-import org.lwjgl.opengl.Display;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
@@ -29,8 +28,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @SideOnly(Side.CLIENT)
 @Mixin(value = {Minecraft.class}, priority = 9999)
 public abstract class MixinMinecraft {
-    private static final String CLIENT_WINDOW_TITLE = "MyauShadow v1.0";
-
     @Shadow
     private int leftClickCounter;
     @Shadow
@@ -41,6 +38,8 @@ public abstract class MixinMinecraft {
     public EntityPlayerSP thePlayer;
     @Shadow
     public GuiScreen currentScreen;
+    @Shadow
+    public boolean skipRenderWorld;
 
     @Inject(
             method = {"startGame"},
@@ -55,34 +54,28 @@ public abstract class MixinMinecraft {
             at = {@At("RETURN")}
     )
     private void postStartGame(CallbackInfo callbackInfo) {
-        IconUtils.initLwjglIcon();
-        Display.setTitle(CLIENT_WINDOW_TITLE);
         new Myau();
     }
 
     @Inject(
-            method = {"displayDebugInfo"},
-            at = {@At("RETURN")}
-    )
-    private void displayDebugInfo(long timeSlice, CallbackInfo callbackInfo) {
-        Display.setTitle(CLIENT_WINDOW_TITLE);
-    }
-
-    @Inject(
             method = {"displayGuiScreen"},
-            at = {@At("HEAD")},
-            cancellable = true
+            at = @At(
+                    value = "FIELD",
+                    target = "Lnet/minecraft/client/Minecraft;currentScreen:Lnet/minecraft/client/gui/GuiScreen;",
+                    shift = At.Shift.AFTER
+            )
     )
-    private void displayGuiScreen(GuiScreen guiScreenIn, CallbackInfo callbackInfo) {
-        if (guiScreenIn == null && this.theWorld == null) {
-            ((Minecraft) (Object) this).displayGuiScreen(new GuiMyauMainMenu());
-            callbackInfo.cancel();
-            return;
-        }
-
-        if (guiScreenIn instanceof GuiMainMenu && !(guiScreenIn instanceof GuiMyauMainMenu)) {
-            ((Minecraft) (Object) this).displayGuiScreen(new GuiMyauMainMenu());
-            callbackInfo.cancel();
+    private void displayGuiScreen(CallbackInfo callbackInfo) {
+        if (this.currentScreen instanceof GuiMainMenu && !(this.currentScreen instanceof GuiMyauMainMenu)) {
+            Minecraft minecraft = (Minecraft) (Object) this;
+            this.currentScreen = new GuiMyauMainMenu();
+            ScaledResolution scaledResolution = new ScaledResolution(minecraft);
+            this.currentScreen.setWorldAndResolution(
+                    minecraft,
+                    scaledResolution.getScaledWidth(),
+                    scaledResolution.getScaledHeight()
+            );
+            this.skipRenderWorld = false;
         }
     }
 

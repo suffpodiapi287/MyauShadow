@@ -137,6 +137,7 @@ public class NameTags extends Module {
                         float absorption = ((EntityLivingBase) entity).getAbsorptionAmount();
                         float max = ((EntityLivingBase) entity).getMaxHealth();
                         float percent = Math.min(Math.max((health + absorption) / max, 0.0F), 1.0F);
+
                         String healText = "";
                         switch (this.healthMode.getValue()) {
                             case 1:
@@ -163,7 +164,18 @@ public class NameTags extends Module {
                                     }
                                 }
                         }
-                        String color = ChatColors.formatColor(String.format("%s&f%s&r%s", distanceText, teamName, healText));
+
+                        String cheatText = "";
+                        if (entity instanceof EntityPlayer) {
+                            CheatDetector cheatDetector = (CheatDetector) Myau.moduleManager.getModule(CheatDetector.class);
+                            if (cheatDetector != null && cheatDetector.isEnabled() && cheatDetector.isCheater((EntityPlayer) entity)) {
+                                cheatText = " &c[Cheater]&r";
+                            }
+                        }
+
+                        String color = ChatColors.formatColor(
+                                String.format("%s&f%s&r%s%s", distanceText, teamName, cheatText, healText)
+                        );
                         int width = mc.fontRendererObj.getStringWidth(color);
                         if (this.backgroundOpacity.getValue() > 0) {
                             Color textColor = !entity.isSneaking() && !entity.isInvisible()
